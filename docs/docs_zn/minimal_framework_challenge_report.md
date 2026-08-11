@@ -1,0 +1,206 @@
+# 最小 Agent Memory 框架挑战：正式 v3 实验报告
+
+> 状态：正式受控机制实验；用于裁决模块去留，不是公开 Agent Memory benchmark 结果，也不构成 SOTA 结论。  
+> 日期：2026-08-07  
+> 结果文件：`results/formal_v3.json`  
+> 失败反例：`results/formal_v2.json`
+
+## 1. 本实验回答什么
+
+本实验不以“让完整框架获胜”为目标，而逐一追问：在候选流、潜在结果、任务序列、评价器和成本口径全部共享时，每个新增模块是否相对更简单的替代方案产生可归因的增益。若模块没有单变量增益，或增益只来自读取潜在真值、改变数据生成过程、修改场景阈值或场景特定调参，则该模块不能进入论文核心贡献。
+
+对应的两个 Research Gaps 是：
+
+1. **Trajectory-Conditioned Associational Overfitting**：记忆暴露、检索策略、任务条件和结果共同内生，历史成功共现不能直接解释为可迁移贡献；
+2. **Scoped Recoverable Governance**：缺少把有作用域、有不确定性的效应证据映射为风险敏感、可撤回访问动作的统一机制。
+
+本实验检验的不是“因果是否在哲学上重要”，而是当前实现中的因果审计、结构、预算和治理模块是否分别为解决上述缺口所必需。
+
+## 2. v2 为什么必须被否定
+
+正式 v2 允许 `unresolved` 因果后验参与风险衰减。这个设计等价于把“证据不足”误写成“有资格改变访问权”，从而在弱效应或平稳环境中制造大规模错误遗忘。
+
+| v2 切片：风险衰减相对固定衰减 | Utility Δ ± 95% CI | Regret reduction | FF-regret reduction | Active-fraction reduction |
+| --- | ---: | ---: | ---: | ---: |
+| 全部世界 | +0.0402 ± 0.0388 | -0.0354 | -0.0234 | +0.0247 |
+| 非复发世界 | -0.1617 ± 0.0464 | -0.0912 | -0.1306 | +0.2578 |
+| stationary associational control | -0.2067 ± 0.0572 | -0.0932 | -0.1908 | +0.5313 |
+| weak-gap stationary | -0.4313 ± 0.0796 | -0.1992 | -0.2908 | +0.5533 |
+
+这里 `Active-fraction reduction > 0` 表示归档了更多热索引记忆。v2 的“压缩”来自错误地让未资格证据驱动衰减，因此不能作为性能收益。该反例直接确立以下不变量：
+
+> `unresolved` 只能触发保守的当前任务条件访问，不能改变持久访问权；只有经过序贯资格门的正向或负向证据，才有权驱动访问衰减或恢复。
+
+## 3. v3 冻结协议
+
+### 3.1 完整性
+
+- schema：`minimal-framework-challenge.v3`；
+- protocol hash：`F8AD57BDECECF20415163975648E5298C0540609C71774404DBAB768CE069C35`；
+- benchmark source hash：`EC28087AB6379D80D62A37387F1E10B2F0DD3967F28F4BB4C3D6D24AD8ED8063`；
+- 6 个命名场景 × 50 seeds × 13 策略 = 3900 行；
+- 120 个随机世界 × 13 策略 = 1560 行；
+- 共 420 个世界、5460 个策略—世界观测；
+- 每个世界的 13 个策略共享任务流、候选流和 item probe 潜在结果；
+- 非有限数值为 0；普通在线结果只更新 association，不更新 causal belief。
+
+### 3.2 禁止的信息泄漏和调参
+
+- 除 `oracle_structure_reference` 外，任何策略都不能读取 true group；
+- latent effect 只由数据生成器和 evaluator 使用；
+- 不使用人工 path label；
+- 所有场景使用同一策略参数，不进行 per-scenario tuning；
+- 历史 association 来自固定的、带内生暴露的微日志，而非独立随机 prior；
+- 语义和关联分数只提出 `ceil(sqrt(N))` shortlist，不授予因果资格；
+- 普通成功/失败共现永远不能进入 causal posterior。
+
+### 3.3 决策与统计门
+
+- 因果信念按 `task.version` 和冻结的 task-conditioned proposal contract 分离；
+- 资格状态为 `positive-qualified`、`negative-qualified`、`unresolved`；
+- 使用 Bonferroni family control 与可求和的 `6/(π²n²)` sequential alpha spending；
+- 探测停止条件为 best-alternative-aware qualification EVSI 不高于有价格的干预成本；
+- fixed expected budget 为 3.20125，固定衰减率为 0.035；
+- archive threshold 为 0.12，restore floor 为 0.38；
+- 报告净效用、零 probe price 效用和 probe/restore break-even price。
+
+## 4. 场景覆盖
+
+| 场景 | 主要压力 |
+| --- | --- |
+| recurring regime shift | 有用机制变得有害，版本变化后再次有效 |
+| one-way obsolescence | 机制过时后不再恢复 |
+| weak-gap stationary | 暴露偏差很弱、没有机制漂移，复杂方法不应制造收益 |
+| noisy recurrence | 存在复发，但自动分组接近失效边界 |
+| high restore cost | 复发存在，但探测和恢复昂贵 |
+| stationary associational control | 历史 association 已是价值的良好代理 |
+| 120 random worlds | 随机改变复发、混杂、结构噪声、观测噪声和干预成本 |
+
+## 5. 全局单模块裁决
+
+所有差值均定义为 `with module − without module`；`Regret/Harm/FF-regret reduction > 0` 为改善；`Active-fraction reduction > 0` 表示归档更多热索引记忆。
+
+| 被挑战模块 | Utility Δ ± 95% CI | Regret reduction | Risk-harm reduction | FF-regret reduction | Active-fraction reduction | Probe-cost change | 裁决 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| item-level causal evidence | -0.0138 ± 0.0068 | -0.0081 | +0.0005 | -0.0024 | +0.0014 | +0.0457 | 当前实现未通过；降级为审计机制 |
+| noisy hierarchy | -0.0079 ± 0.0024 | +0.0044 | -0.0004 | ≈0 | -0.0002 | +0.1194 | 删除核心主张 |
+| task-adaptive budget cap | +0.000004 ± 0.000023 | +0.000001 | +0.000011 | 0 | 0 | +0.000078 | 与 EVSI stop 实质重复，删除 |
+| group-to-item sentinel correction | -0.0051 ± 0.0022 | -0.0040 | +0.0006 | 0 | +0.0004 | +0.0173 | 删除 |
+| qualification-gated risk governance | **+0.2352 ± 0.0228** | **+0.0358** | -0.0060 | **+0.1165** | **-0.3259** | +0.00027 | 保留；当前唯一稳定正向模块 |
+| recoverability | +0.00004 ± 0.00009 | +0.00004 | 0 | 0 | -0.00004 | +0.00002 | 保留为安全不变量，不写性能创新 |
+| oracle structure reference | -0.0004 ± 0.0006 | ≈0 | ≈0 | 0 | 0 | +0.0033 | 无明显结构 headroom |
+
+### 5.1 对“因果模块”的严格解释
+
+`causal evidence` 消融检验的是当前选择性付费 item probe 与资格实现，而不是否定因果识别的研究必要性。它的净效用、零价格效用和 regret 均为负：
+
+- 净 Utility Δ：-0.0138；
+- 零 probe price Utility Δ：-0.0092；
+- probe break-even price：-0.2022。
+
+因此不能声称“当前因果探测提高了整体性能”。它当前只能被定位为：用付费、可证伪的干预证据限制哪些历史共现有资格改变长期访问状态。若真实 benchmark 仍无收益，应将论文进一步收缩为治理协议或诊断方法。
+
+### 5.2 对“解构/层级”的严格解释
+
+层级结构增加约 0.1194 probe-cost units；即使把 probe price 设为零，其 Utility Δ 也只有 +0.0040，当前价格下净效用显著下降。更关键的是，允许读取 true group 的 oracle reference 相对 noisy hierarchy 仍无增益，说明当前受控 DGP 没有提供“更好分组即可获胜”的明显 headroom。
+
+因此：
+
+- 原子化、证据定位和作用域字段可作为可寻址 treatment construction 保留；
+- group posterior 不能授予 item 资格；
+- 自动 hierarchy、PathBundle、group probe、sentinel 不进入最小核心；
+- “解构提高性能”的贡献需要独立真实 Gate A 和单变量公开 benchmark 证据。
+
+### 5.3 对“预算优化”的严格解释
+
+task-adaptive cap 几乎完全不改变任何指标，因为 best-alternative-aware EVSI 已先于预算上限停止。二者同时存在属于重复约束。最终框架只保留一个成本原则：
+
+> cheap signal 负责提出候选；只有当一次额外干预可能改变资格/治理决策，且其期望决策价值高于成本时才付费。
+
+这是一条选择性审计规则，不应包装成独立的“自适应预算模块”。
+
+## 6. 资格门控治理的预注册切片
+
+| 切片 | Utility Δ ± 95% CI | Regret reduction | Risk-harm reduction | FF-regret reduction | Active-fraction reduction |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 全部世界 | +0.2352 ± 0.0228 | +0.0358 | -0.0060 | +0.1165 | -0.3259 |
+| recurring regime shift | +0.1564 ± 0.0383 | +0.0055 | -0.0065 | +0.0716 | -0.2889 |
+| one-way obsolescence | +0.1233 ± 0.0391 | -0.0052 | -0.0081 | +0.0620 | -0.2847 |
+| weak-gap stationary | +0.0871 ± 0.0207 | +0.0248 | 0 | +0.0778 | -0.3025 |
+| noisy recurrence | +0.4925 ± 0.0706 | +0.0797 | -0.0079 | +0.1912 | -0.3961 |
+| high restore cost | +0.4143 ± 0.0771 | +0.0511 | -0.0161 | +0.1724 | -0.3376 |
+| stationary associational control | +0.0447 ± 0.0081 | +0.0133 | 0 | +0.0523 | -0.2714 |
+| random weak gap | +0.3853 ± 0.0989 | +0.0772 | -0.0033 | +0.1715 | -0.3817 |
+| random noisy decomposition | +0.3159 ± 0.0963 | +0.0609 | -0.0073 | +0.1724 | -0.3550 |
+| random high intervention cost | +0.2974 ± 0.0853 | +0.0592 | -0.0049 | +0.1562 | -0.3686 |
+
+该模块在所有命名切片上均提高净效用和降低 false-forgetting regret，但它平均保留更多热索引记忆，并未改善 risk-weighted harm。因此，受支持的主张是：
+
+> 资格门阻止未资格证据驱动的错误遗忘，并以更保守的访问治理换取效用；它不是更强的压缩器，也尚未证明更低的总体危害。
+
+## 7. 成本与 break-even
+
+| 模块 | 零 probe price Utility Δ | Probe break-even price | Restore break-even price | 解释 |
+| --- | ---: | ---: | ---: | --- |
+| causal evidence | -0.0092 | -0.2022 | — | 即使探测免费，当前实现也无性能收益 |
+| hierarchy | +0.0040 | 0.0336 | — | 只有探测价格低于当前 0.1 的约三分之一时才可能回本 |
+| adaptive cap | +0.000012 | 0.1548 | — | 差异来自极少数数值边界，功能仍与 EVSI stop 重复 |
+| sentinel | -0.0034 | -0.1965 | — | 即使探测免费仍退化 |
+| qualification-gated governance | +0.2352 | 858.84 | — | 增益几乎不是由额外 probe 支出造成 |
+| recoverability | +0.00004 | 2.1129 | 1.5701 | 事件极少且置信区间跨零，不能写成性能贡献 |
+
+break-even 只回答当前受控 DGP 下“单位价格最多可到多少”，不应外推为真实 API、人工标注或线上试验成本。
+
+## 8. 最终模块去留
+
+### 8.1 进入最小完整框架
+
+1. **Evidence-preserving atomic treatment construction**：保留原始证据和来源，把复合轨迹转成可寻址候选；cheap signals 只决定测谁；
+2. **Conditional associational access**：未资格证据仅在当前低风险任务中折扣使用，不能升级为因果状态；
+3. **Selective scoped causal audit**：以付费干预提供可证伪资格证据；当前不主张其性能收益；
+4. **Sequential causal qualification**：按 version/scope 输出 positive、negative 或 unresolved，并控制 family-wise 与 repeated-look 错误；
+5. **Qualification-Gated Access Governance**：unresolved 不改变持久访问权；qualified evidence 才能触发 protect、downweight、isolate、archive 或 recovery；
+6. **Evidence Survival / Relation Belief / Access Policy 分离**：任何派生状态不得覆盖原始证据；
+7. **Recovery path**：保留冷存储和重新验证接口，作为安全与可审计不变量。
+
+### 8.2 从核心中删除
+
+- group-level causal hierarchy；
+- task-adaptive budget cap；
+- group-to-item sentinel correction；
+- item-level veto 的旧实现；
+- contextual linear effect；
+- 自动 semantic scope bins；
+- 由 unresolved posterior 驱动的连续衰减；
+- recoverability performance contribution；
+- “causal probing improves utility”的当前主张。
+
+## 9. 论文可写与不可写的结论
+
+### 可以写
+
+- 在受控内生曝光世界中，未经资格门约束的风险衰减会造成可复现的错误遗忘；
+- v3 的资格门控访问治理相对固定时间衰减显著降低 false-forgetting regret 并提高净效用；
+- 结构、预算上限和恢复模块在当前协议下没有独立正向证据，因此被删除或降级；
+- 原始证据、关系信念和访问策略必须作为不同状态维护。
+
+### 不能写
+
+- 当前方法超过 FadeMem、Oblivion、Memory Worth、DeMem 或任何真实 Agent Memory SOTA；
+- 因果探测已提高公开 benchmark 性能；
+- 自动解构或层级结构已获得性能验证；
+- 框架实现更强压缩或更低总体风险；
+- 受控潜在结果可以替代真实 task/agent/tool 漂移实验。
+
+## 10. 复现与验收
+
+```powershell
+python minimal_framework_challenge_benchmark.py --named-seeds 50 --random-world-seeds 120 --output results/formal_v3.json
+python -m pytest -q test_minimal_framework_challenge_benchmark.py
+```
+
+交付前必须重新核验：代码 hash 与 JSON 中 `benchmark_source_sha256` 一致；所有世界包含完整 13 策略；命名/随机行数分别为 3900/1560；所有数值有限；测试通过；Markdown 与 JSON 不含 U+FFFD。
+
+## 11. 最终实验论证
+
+> 在本受控机制实验中，我们没有证明“更多因果、更多层级或更多预算组件”带来更好性能；我们证明的是一个更窄但可证伪的结论：只有已经通过有作用域序贯资格门的证据，才应获得改变长期访问权的权限。该约束阻止了未决证据造成的错误遗忘，但以保留更多活跃记忆为代价。公开 benchmark 上的端到端有效性、真实干预成本和跨系统可迁移性仍待验证。

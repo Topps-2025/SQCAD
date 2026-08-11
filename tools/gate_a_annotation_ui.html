@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gate A 离线标注器</title>
+  <style>
+    :root { --ink:#19212b; --muted:#657080; --line:#d7dde5; --accent:#9b1c31; --soft:#f5f6f8; --ok:#236b43; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:#eef0f3; font:14px/1.55 system-ui,"Microsoft YaHei",sans-serif; }
+    header { position:sticky; top:0; z-index:10; display:flex; gap:12px; align-items:center; padding:10px 18px; color:white; background:#202834; }
+    header h1 { margin:0; font-size:17px; }
+    button,.button { border:1px solid #aab2bd; border-radius:5px; padding:6px 10px; background:white; cursor:pointer; }
+    button.primary { color:white; border-color:var(--accent); background:var(--accent); }
+    button.danger { color:#8a1227; }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    input,select,textarea { width:100%; border:1px solid #b8c0ca; border-radius:4px; padding:6px; background:white; font:inherit; }
+    textarea { min-height:68px; }
+    .layout { display:grid; grid-template-columns:260px minmax(420px,1.25fr) minmax(420px,1fr); gap:12px; max-width:1900px; margin:auto; padding:12px; }
+    .panel { min-width:0; border:1px solid var(--line); border-radius:7px; background:white; box-shadow:0 1px 4px #0000000d; }
+    .panel h2,.panel h3 { margin:0; padding:10px 12px; border-bottom:1px solid var(--line); font-size:15px; }
+    .panel-body { padding:10px 12px; }
+    .sidebar { position:sticky; top:60px; height:calc(100vh - 72px); overflow:auto; }
+    .packet-item { display:block; width:100%; padding:8px 10px; border:0; border-bottom:1px solid #eceff2; border-radius:0; text-align:left; }
+    .packet-item.active { color:white; background:var(--accent); }
+    .packet-item small { display:block; opacity:.75; }
+    .meta { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+    .question { margin:0 0 10px; padding:12px; border-left:4px solid var(--accent); background:#fff7f8; font-size:16px; }
+    .session { margin:0 0 12px; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+    .session-title { padding:6px 9px; background:#e9edf2; font-weight:600; }
+    .turn { border-top:1px solid #e7eaee; }
+    .turn-role { display:inline-block; margin:6px 8px 0; padding:1px 6px; border-radius:10px; color:white; background:#526173; font-size:11px; }
+    .turn-role.user { background:#236b43; }
+    pre.turn-text { margin:0; padding:6px 10px 10px; white-space:pre-wrap; word-break:break-word; font:13px/1.5 ui-monospace,Consolas,monospace; }
+    .selection-bar { position:sticky; top:58px; z-index:5; display:flex; gap:8px; padding:8px; border:1px solid #e2c3ca; background:#fff4f6; }
+    .tabs { display:flex; gap:4px; padding:8px 8px 0; border-bottom:1px solid var(--line); }
+    .tab { border-bottom:0; border-radius:5px 5px 0 0; }
+    .tab.active { color:white; background:#4b596a; }
+    .tab-pane { display:none; padding:10px; }
+    .tab-pane.active { display:block; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    .form-grid .wide { grid-column:1/-1; }
+    label { display:block; color:#3c4653; font-size:12px; }
+    table { width:100%; margin-top:10px; border-collapse:collapse; font-size:12px; }
+    th,td { padding:5px; border:1px solid var(--line); vertical-align:top; text-align:left; word-break:break-word; }
+    th { background:var(--soft); }
+    .notice { margin:8px 0; padding:8px; border-left:4px solid #bc8120; background:#fff8e8; }
+    .ok { color:var(--ok); }
+    .status { margin-left:auto; color:#dce2ea; }
+    @media (max-width:1200px) { .layout { grid-template-columns:220px 1fr; } .annotation { grid-column:1/-1; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>LongMemEval 语义解构 Gate A</h1>
+  <label class="button">载入盲化 JSONL<input id="fileInput" type="file" accept=".jsonl,.txt" hidden></label>
+  <button id="downloadBtn" class="primary" disabled>下载当前标注 JSONL</button>
+  <button id="validateBtn" disabled>检查当前包</button>
+  <span id="headerStatus" class="status">尚未载入数据</span>
+</header>
+
+<main class="layout">
+  <aside class="panel sidebar">
+    <h2>问题包</h2>
+    <div class="panel-body">
+      <input id="filterInput" placeholder="筛选 ID / 类型 / 状态">
+      <div class="meta" style="margin-top:8px">
+        <button id="prevBtn" disabled>上一包</button><button id="nextBtn" disabled>下一包</button>
+      </div>
+    </div>
+    <div id="packetList"></div>
+  </aside>
+
+  <section class="panel evidence">
+    <h2>问题与原始证据</h2>
+    <div class="panel-body">
+      <div id="emptyEvidence" class="notice">请选择一份 `pilot_annotator_*.jsonl`。界面完全离线，不发送数据。</div>
+      <div id="packetMeta" hidden>
+        <div class="meta"><div><b>ID：</b><span id="qid"></span></div><div><b>类型：</b><span id="qtype"></span></div></div>
+        <p id="question" class="question"></p>
+        <div class="selection-bar">
+          <button id="addSpanBtn" class="primary">把当前选择加入 Evidence span</button>
+          <span id="selectionHint">请在同一个 turn 内选择文本。</span>
+        </div>
+        <div id="sessions"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel annotation">
+    <h2>结构化标注</h2>
+    <div class="tabs">
+      <button class="tab active" data-tab="spans">Spans</button>
+      <button class="tab" data-tab="factors">Factors</button>
+      <button class="tab" data-tab="relations">Relations</button>
+      <button class="tab" data-tab="rules">Rules / 状态</button>
+    </div>
+    <div id="spans" class="tab-pane active"><div id="spanTable"></div></div>
+    <div id="factors" class="tab-pane">
+      <div class="form-grid">
+        <label>Factor type<select id="factorType"><option>entity</option><option>attribute</option><option>condition</option><option>action</option><option>outcome</option><option>preference</option><option>time</option><option>constraint</option><option>tool</option><option>version</option></select></label>
+        <label>Polarity<select id="factorPolarity"><option>positive</option><option>negative</option><option>unknown</option></select></label>
+        <label class="wide">Normalized form<input id="factorNormalized"></label>
+        <label class="wide">Span IDs（逗号分隔）<input id="factorSpans"></label>
+        <label>Subject scope<input id="factorSubject"></label><label>Task scope<input id="factorTask"></label>
+        <label>Temporal scope<input id="factorTime"></label>
+        <label>Evidential status<select id="factorEvidence"><option>explicit</option><option>necessary_inference</option><option>hypothesized</option><option>contradicted</option></select></label>
+        <button id="addFactorBtn" class="primary wide">添加 Factor</button>
+      </div><div id="factorTable"></div>
+    </div>
+    <div id="relations" class="tab-pane">
+      <div class="form-grid">
+        <label>Relation type<select id="relationType"></select></label>
+        <label>Evidential status<select id="relationEvidence"><option>explicit</option><option>necessary_inference</option><option>hypothesized</option><option>contradicted</option></select></label>
+        <label class="wide">Source factor IDs<input id="relationSource"></label>
+        <label class="wide">Target factor IDs<input id="relationTarget"></label>
+        <label class="wide">Span IDs<input id="relationSpans"></label>
+        <button id="addRelationBtn" class="primary wide">添加 Relation</button>
+      </div><div id="relationTable"></div>
+    </div>
+    <div id="rules" class="tab-pane">
+      <div class="form-grid">
+        <label class="wide">Antecedent factor IDs<input id="ruleAntecedent"></label>
+        <label class="wide">Consequent factor IDs<input id="ruleConsequent"></label>
+        <label class="wide">Support span IDs<input id="ruleSpans"></label>
+        <label>Subject scope<input id="ruleSubject"></label><label>Task scope<input id="ruleTask"></label>
+        <label>Time scope<input id="ruleTime"></label><label>Tool version<input id="ruleTool"></label>
+        <label class="wide">Counterexample check<textarea id="ruleCounterexample"></textarea></label>
+        <button id="addRuleBtn" class="primary wide">添加 Rule candidate</button>
+      </div>
+      <div id="ruleTable"></div>
+      <hr>
+      <label>Query-required factor IDs<input id="requiredFactors"></label>
+      <label>标注状态<select id="annotationStatus"><option>unannotated</option><option>in_progress</option><option>double_annotated</option><option>adjudicated</option></select></label>
+      <label>Notes<textarea id="notes"></textarea></label>
+      <button id="saveStateBtn" class="primary">保存当前状态</button>
+      <div class="notice">盲化工作区不含参考答案。两名标注者在裁决前不得交换 JSONL。</div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const relationTypes = ["is_a","has_attribute","belongs_to","part_of","before","after","during","valid_from","expired_at","updates","contradicts","supersedes","reaffirms","performs","uses_tool","produces","prevents","enables","applicable_under","scoped_to","exception_to","prefers","avoids","indifferent_to","causal_candidate"];
+let packets = [], currentIndex = -1, loadedName = "gate_a_annotations.jsonl";
+const $ = id => document.getElementById(id);
+const csv = value => value.split(",").map(x=>x.trim()).filter(Boolean);
+const nextId = (items,key,prefix) => prefix + "_" + String(items.length ? Math.max(...items.map(x=>Number(String(x[key]).split("_").pop())||0))+1 : 1).padStart(3,"0");
+const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+
+function current(){ return packets[currentIndex]; }
+function annotation(){ return current().annotation; }
+function setEnabled(enabled){ ["downloadBtn","validateBtn","prevBtn","nextBtn"].forEach(id=>$(id).disabled=!enabled); }
+function markProgress(){ if(annotation().status === "unannotated") annotation().status = "in_progress"; renderHeader(); }
+
+function readJsonl(text){
+  return text.split(/\r?\n/).filter(line=>line.trim()).map((line,i)=>{ try{return JSON.parse(line)}catch(e){throw new Error(`第${i+1}行不是合法JSON：${e.message}`)} });
+}
+$("fileInput").addEventListener("change", async event=>{
+  const file=event.target.files[0]; if(!file)return;
+  try { packets=readJsonl(await file.text()); loadedName=file.name.replace(/\.jsonl$/i,"")+"_annotated.jsonl"; currentIndex=0; setEnabled(true); renderAll(); }
+  catch(error){ alert(error.message); }
+});
+
+function renderAll(){ renderList(); renderPacket(); renderHeader(); }
+function renderHeader(){
+  if(currentIndex<0){$("headerStatus").textContent="尚未载入数据";return;}
+  const done=packets.filter(p=>p.annotation.status!=="unannotated").length;
+  $("headerStatus").textContent=`${currentIndex+1}/${packets.length}；已开始 ${done} 包；${annotation().annotator_id||"未指定标注者"}`;
+}
+function renderList(){
+  const filter=$("filterInput").value.toLowerCase();
+  $("packetList").innerHTML=packets.map((p,i)=>({p,i})).filter(({p})=>`${p.question_id} ${p.question_type} ${p.annotation.status}`.toLowerCase().includes(filter)).map(({p,i})=>`<button class="packet-item ${i===currentIndex?"active":""}" data-index="${i}">${escapeHtml(p.question_id)}<small>${escapeHtml(p.question_type)} · ${escapeHtml(p.annotation.status)}</small></button>`).join("");
+  document.querySelectorAll(".packet-item").forEach(b=>b.onclick=()=>{currentIndex=Number(b.dataset.index);renderAll()});
+}
+$("filterInput").oninput=renderList;
+$("prevBtn").onclick=()=>{if(currentIndex>0){currentIndex--;renderAll()}};
+$("nextBtn").onclick=()=>{if(currentIndex<packets.length-1){currentIndex++;renderAll()}};
+
+function renderPacket(){
+  if(currentIndex<0)return;
+  $("emptyEvidence").hidden=true; $("packetMeta").hidden=false;
+  const p=current(); $("qid").textContent=p.question_id; $("qtype").textContent=p.question_type; $("question").textContent=p.question;
+  $("sessions").innerHTML=p.evidence_sessions.map(s=>`<article class="session"><div class="session-title">${escapeHtml(s.session_id)} · ${escapeHtml(s.date)}</div>${s.turns.map((t,i)=>`<div class="turn"><span class="turn-role ${escapeHtml(t.role)}">${escapeHtml(t.role)} · turn ${i}</span><pre class="turn-text" data-session="${escapeHtml(s.session_id)}" data-turn="${i}" data-role="${escapeHtml(t.role)}"></pre></div>`).join("")}</article>`).join("");
+  document.querySelectorAll("pre.turn-text").forEach(pre=>{
+    const s=p.evidence_sessions.find(x=>x.session_id===pre.dataset.session); pre.textContent=s.turns[Number(pre.dataset.turn)].content;
+  });
+  $("annotationStatus").value=annotation().status; $("notes").value=annotation().notes||""; $("requiredFactors").value=annotation().query_required_factor_ids.join(", ");
+  renderTables();
+}
+
+function offsetWithin(root,node,offset){
+  const range=document.createRange(); range.selectNodeContents(root); range.setEnd(node,offset); return range.toString().length;
+}
+$("addSpanBtn").onclick=()=>{
+  const sel=window.getSelection(); if(!sel.rangeCount||sel.isCollapsed){alert("请先选择文本");return;}
+  const range=sel.getRangeAt(0); const pre=range.commonAncestorContainer.nodeType===1?range.commonAncestorContainer.closest("pre.turn-text"):range.commonAncestorContainer.parentElement.closest("pre.turn-text");
+  if(!pre||!pre.contains(range.startContainer)||!pre.contains(range.endContainer)){alert("选择必须位于同一个 turn 内");return;}
+  const start=offsetWithin(pre,range.startContainer,range.startOffset), end=offsetWithin(pre,range.endContainer,range.endOffset); if(end<=start)return;
+  annotation().evidence_spans.push({span_id:nextId(annotation().evidence_spans,"span_id","sp"),session_id:pre.dataset.session,turn_index:Number(pre.dataset.turn),char_start:start,char_end:end,text:pre.textContent.slice(start,end),role:pre.dataset.role});
+  sel.removeAllRanges(); markProgress(); renderTables();
+};
+
+function table(rows,columns,type){
+  if(!rows.length)return `<p class="notice">尚无 ${type}。</p>`;
+  return `<table><thead><tr>${columns.map(c=>`<th>${c[0]}</th>`).join("")}<th></th></tr></thead><tbody>${rows.map((row,i)=>`<tr>${columns.map(c=>`<td>${escapeHtml(c[1](row))}</td>`).join("")}<td><button class="danger delete-row" data-type="${type}" data-index="${i}">删除</button></td></tr>`).join("")}</tbody></table>`;
+}
+function renderTables(){
+  const a=annotation();
+  $("spanTable").innerHTML=table(a.evidence_spans,[["ID",x=>x.span_id],["位置",x=>`${x.session_id}/turn${x.turn_index}[${x.char_start},${x.char_end})`],["文本",x=>x.text]],"span");
+  $("factorTable").innerHTML=table(a.factors,[["ID",x=>x.factor_id],["类型",x=>x.factor_type],["规范值",x=>x.normalized_form],["Spans",x=>x.span_ids.join(",")],["Scope",x=>`${x.subject_scope||""}/${x.task_scope||""}/${x.temporal_scope||""}`]],"factor");
+  $("relationTable").innerHTML=table(a.relations,[["ID",x=>x.relation_id],["类型",x=>x.relation_type],["Source→Target",x=>`${x.source_factor_ids.join(",")} → ${x.target_factor_ids.join(",")}`],["Spans",x=>x.span_ids.join(",")]],"relation");
+  $("ruleTable").innerHTML=table(a.abstract_rule_candidates,[["ID",x=>x.rule_id],["Antecedent→Consequent",x=>`${x.antecedent_factor_ids.join(",")} → ${x.consequent_factor_ids.join(",")}`],["Scope",x=>JSON.stringify(x.scope)]],"rule");
+  document.querySelectorAll(".delete-row").forEach(b=>b.onclick=()=>{const map={span:"evidence_spans",factor:"factors",relation:"relations",rule:"abstract_rule_candidates"};annotation()[map[b.dataset.type]].splice(Number(b.dataset.index),1);markProgress();renderTables()});
+}
+
+$("addFactorBtn").onclick=()=>{
+  const a=annotation(), normalized=$("factorNormalized").value.trim(), spans=csv($("factorSpans").value); if(!normalized||!spans.length){alert("Normalized form 与 Span IDs 必填");return;}
+  a.factors.push({factor_id:nextId(a.factors,"factor_id","fa"),factor_type:$("factorType").value,normalized_form:normalized,span_ids:spans,subject_scope:$("factorSubject").value.trim()||null,task_scope:$("factorTask").value.trim()||null,temporal_scope:$("factorTime").value.trim()||null,polarity:$("factorPolarity").value,evidential_status:$("factorEvidence").value});
+  $("factorNormalized").value=""; $("factorSpans").value=""; markProgress(); renderTables();
+};
+relationTypes.forEach(x=>$("relationType").insertAdjacentHTML("beforeend",`<option>${x}</option>`));
+$("addRelationBtn").onclick=()=>{
+  const a=annotation(), source=csv($("relationSource").value), target=csv($("relationTarget").value), spans=csv($("relationSpans").value); if(!source.length||!target.length||!spans.length){alert("Source、Target 与 Span IDs 必填");return;}
+  const type=$("relationType").value; a.relations.push({relation_id:nextId(a.relations,"relation_id","re"),relation_type:type,source_factor_ids:source,target_factor_ids:target,span_ids:spans,evidential_status:$("relationEvidence").value,causal_validation_required:type==="causal_candidate"});
+  markProgress(); renderTables();
+};
+$("addRuleBtn").onclick=()=>{
+  const a=annotation(), antecedent=csv($("ruleAntecedent").value), consequent=csv($("ruleConsequent").value), spans=csv($("ruleSpans").value), check=$("ruleCounterexample").value.trim(); if(!antecedent.length||!consequent.length||!spans.length||!check){alert("因子、证据与反例检查均必填");return;}
+  const ruleId=nextId(a.abstract_rule_candidates,"rule_id","ru"); a.abstract_rule_candidates.push({rule_id:ruleId,antecedent_factor_ids:antecedent,consequent_factor_ids:consequent,scope:{subject:$("ruleSubject").value.trim()||null,task:$("ruleTask").value.trim()||null,time:$("ruleTime").value.trim()||null,tool_version:$("ruleTool").value.trim()||null},support_span_ids:spans,status:"candidate",causal_validation_required:true});
+  a.counterexample_checks.push({rule_id:ruleId,description:check,status:"pending"}); markProgress(); renderTables();
+};
+$("saveStateBtn").onclick=()=>{annotation().status=$("annotationStatus").value;annotation().notes=$("notes").value.trim()||null;annotation().query_required_factor_ids=csv($("requiredFactors").value);renderAll()};
+
+function validateCurrent(show=true){
+  const a=annotation(), spanIds=new Set(a.evidence_spans.map(x=>x.span_id)), factorIds=new Set(a.factors.map(x=>x.factor_id)), errors=[];
+  a.factors.forEach(x=>x.span_ids.forEach(id=>{if(!spanIds.has(id))errors.push(`${x.factor_id} 引用不存在的 ${id}`)}));
+  a.relations.forEach(x=>{[...x.source_factor_ids,...x.target_factor_ids].forEach(id=>{if(!factorIds.has(id))errors.push(`${x.relation_id} 引用不存在的 ${id}`)});x.span_ids.forEach(id=>{if(!spanIds.has(id))errors.push(`${x.relation_id} 引用不存在的 ${id}`)})});
+  a.query_required_factor_ids.forEach(id=>{if(!factorIds.has(id))errors.push(`Query-required 引用不存在的 ${id}`)});
+  if(show)alert(errors.length?errors.join("\n"):"当前包的前端引用检查通过；下载后仍需运行 Python 校验器。"); return errors;
+}
+$("validateBtn").onclick=()=>validateCurrent(true);
+$("downloadBtn").onclick=()=>{
+  if(currentIndex>=0){annotation().status=$("annotationStatus").value;annotation().notes=$("notes").value.trim()||null;annotation().query_required_factor_ids=csv($("requiredFactors").value)}
+  const text=packets.map(p=>JSON.stringify(p)).join("\n")+"\n", blob=new Blob([text],{type:"application/x-ndjson;charset=utf-8"}), url=URL.createObjectURL(blob), a=document.createElement("a"); a.href=url;a.download=loadedName;a.click();URL.revokeObjectURL(url);
+};
+document.querySelectorAll(".tab").forEach(tab=>tab.onclick=()=>{document.querySelectorAll(".tab,.tab-pane").forEach(x=>x.classList.remove("active"));tab.classList.add("active");$(tab.dataset.tab).classList.add("active")});
+</script>
+</body>
+</html>

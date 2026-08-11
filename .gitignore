@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local outputs and external database
+results/
+*.jsonl
+*.sqlite
+*.db
+database/
+data/
+models/
+artifacts/
+tmp/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.obsidian/

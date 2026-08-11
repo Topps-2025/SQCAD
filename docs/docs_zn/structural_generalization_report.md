@@ -1,0 +1,184 @@
+---
+type: experiment-report
+status: completed-controlled-mechanism-study
+scope: cross-trajectory-cross-DGP-cross-topology
+evidence_level: synthetic-mechanism-and-policy-stress-test
+canonical_result: results/structural_generalization_topology_v2_1.json
+---
+
+# 结构泛化实验报告：跨轨迹、跨 DGP 与跨候选拓扑
+
+## 1. 实验目的与严格边界
+
+本实验检验最新版框架是否在固定算法与固定成本合同下，对“轨迹条件化的关联过拟合”表现出结构性优势。它不训练 LLM、不使用人工路径标签、不读取 evaluator-only 的真实机制/风险提示，也不做逐域超参数调节。它是 synthetic mechanism stress test，不是公开 Agent Memory benchmark，不支持 SOTA 或真实企业私有轨迹的直接性能结论。
+
+实验要回答三个问题：
+
+1. 在关联共现受到任务难度、检索流行度和策略曝光混杂时，分层反事实探测能否降低选择 regret 和 harmful selection？
+2. 当组件结构可恢复、干预成本可承受时，层级探测能否相对强项级 LCB 探测取得更好的成本—效用折中？
+3. 当 gap 不存在、解构结构弱/噪声大或干预过贵时，框架是否会诚实地失去优势？
+
+## 2. 预注册式协议
+
+### 2.1 固定设置
+
+- 8 个命名 DGP；每个 DGP 50 个 seed、每 seed 120 episodes，共 48,000 个命名世界 episode；
+- 120 个随机 DGP seed、每 seed 60 episodes，共 7,200 个随机世界 episode；
+- 随机世界同时抽样机制参数和候选拓扑：group count 为 4–10，items per group 为 2–5；本次正式运行实际覆盖 group count 4–10 和 items per group 2–5 的多个取值；
+- 每个 episode 随机置换 group value，使 observed group id 没有固定价值含义；
+- task risk 与 ambiguity 只用于统一预算规则，不含 path-level latent label；
+- intervention cost、observation noise、decomposition accuracy 和 drift 均由 DGP 生成；
+- 所有策略共享 candidate stream、task、observation draws、evaluator、task budget 与 cost coefficient；
+- 固定参数跨所有 DGP，`per_domain_tuning=false`；不使用 manual path labels、privileged path-level cues、learned parameters 或 fine-tuning。
+
+### 2.2 DGP 压力场景
+
+| 场景 | 机制压力 | 设计目的 |
+| --- | --- | --- |
+| `core_endogenous` | 高共现混杂、弱语义对齐、中等漂移 | 主 gap 场景 |
+| `cross_domain_negative_alignment` | 表面相似度与部署价值反向 | 检验语义/关联误导 |
+| `high_drift` | 一组机制发生方向反转 | 检验作用域与更新 |
+| `low_overlap_noisy_intervention` | 干预噪声高、成本高 | 检验识别边界 |
+| `noisy_decomposition` | 自动分组准确率接近失败边界 | 检验结构误差传播 |
+| `weak_structure` | 组内效应低相干 | 明确结构失效反例 |
+| `semantic_aligned_stationary` | 关联/语义信号可靠且无漂移 | gap 缺失反例 |
+| `high_intervention_cost` | gap 存在但干预代价高 | 检验成本边界 |
+
+随机世界按预先定义的理论条件分层：
+
+- `identifiable_gap`：confounding ≥ 0.50、coherence ≥ 0.60、decomposition accuracy ≥ 0.70、intervention cost scale ≤ 1.30；
+- `gap_but_structure_or_cost_failure`：confounding ≥ 0.50，但至少一个结构可识别/成本条件失败；
+- `weak_gap`：confounding < 0.50。
+
+分层不使用本方法的结果，不是 post-hoc performance partition。
+
+## 3. 对照策略
+
+| 策略 | 观察信息 | 干预 | 作用 |
+| --- | --- | --- | --- |
+| `semantic` | semantic score | 无 | 语义相似度边界 |
+| `association` | success-cooccurrence association score | 无 | Memory Worth-like 关联治理 |
+| `fixed_hybrid` | 固定语义+关联 | 无 | 无反事实混合基线 |
+| `uniform_item_probe` | 弱关联先验+逐项观测 | 均匀项级 probe | 低结构强干预基线 |
+| `greedy_item_lcb` | 弱关联先验+项级后验 | 逐项 LCB 选择 | 强项级 causal baseline |
+| `full_item_probe` | 项级反事实观测 | 全量项 probe | 高成本上界 |
+| `hierarchical_no_gate` | 自动 observed groups | group→item | 去掉 observ. agreement gate 的结构对照 |
+| `hierarchical_framework` | 任务风险/歧义、自动分组、公共观察先验和已付费 probe outcome | group→item + VOI/成本 gate | 完整框架 |
+
+Proposed 不知道 `true_group`、`train_effect`、`test_effect`、drift group 或 evaluator 的 oracle value。`observed_group` 是 decomposition output，且按 scenario accuracy 可能被扰动。
+
+## 4. 评价指标
+
+- `regret`：相对 episode oracle path value 的差距，越低越好；
+- `net_utility`：选中路径 value 减去干预成本，越高越好；
+- `harmful_selection`：选中 test effect < 0 的比例，越低越好；
+- `intervention_cost` 与 `probes`：识别开销；
+- seed-level mean、SD、95% CI half-width；
+- pairwise win rate：在每个 seed 上 framework 相对基线的方向胜率，不代替均值和区间。
+
+## 5. 正式结果
+
+### 5.1 命名 DGP
+
+| 场景 | Association regret / net | Greedy item LCB regret / net | Hierarchical framework regret / net |
+| --- | ---: | ---: | ---: |
+| core_endogenous | 1.1722 / 0.5751 | 0.4808 / 0.7812 | **0.2549 / 1.0175** |
+| cross_domain_negative_alignment | 0.7525 / **0.8588** | 0.4007 / 0.7248 | **0.3641** / 0.7707 |
+| high_drift | 0.9521 / 0.6820 | 0.4284 / 0.7201 | **0.3318 / 0.8303** |
+| low_overlap_noisy_intervention | 0.9722 / **0.7057** | 0.6569 / 0.5392 | **0.5868** / 0.6248 |
+| noisy_decomposition | 0.9855 / 0.6936 | **0.4807 / 0.7138** | 0.4953 / 0.7132 |
+| weak_structure | 1.0886 / **0.0739** | 0.6269 / 0.0502 | **0.6262** / 0.0644 |
+| semantic_aligned_stationary | **0.2474 / 1.3186** | 0.1952 / 0.8851 | 0.2886 / 0.8953 |
+| high_intervention_cost | 1.0485 / **0.6576** | 0.7225 / 0.5390 | **0.6083** / 0.6487 |
+
+该表同时包含胜负和反例：框架在核心内生、漂移和高成本场景取得较低 regret；在语义/关联已经可靠时，零成本 association 明显更优；在 noisy decomposition 和 weak structure 中，框架不应被包装成无条件优势。
+
+### 5.2 随机 DGP 与随机候选拓扑
+
+120 个随机世界总体均值为：
+
+| 策略 | regret | net utility | harmful selection | 平均 intervention cost |
+| --- | ---: | ---: | ---: | ---: |
+| Association | 0.8168 | **0.7023** | 0.1369 | 0.0000 |
+| Greedy item LCB | **0.5034** | 0.5346 | 0.0325 | 4.8112 |
+| Hierarchical framework | 0.5382 | 0.5249 | 0.0396 | 4.5606 |
+
+随机总体并不支持“框架天然全面胜出”：关联方法在净效用上更高，项级 LCB 在 regret 上更低。这个结果是重要的边界证据，而不是需要通过调参消除的噪声。
+
+### 5.3 理论分层结果
+
+| 分层（seed 数） | 策略 | regret | net utility | harmful selection |
+| --- | --- | ---: | ---: | ---: |
+| identifiable_gap (27) | Association | 0.9587 | 0.7089 | 0.1463 |
+|  | Greedy item LCB | 0.4942 | 0.6880 | 0.0191 |
+|  | Hierarchical framework | **0.4528** | **0.7570** | **0.0154** |
+| gap_but_structure_or_cost_failure (56) | Association | 0.9220 | **0.5489** | 0.1702 |
+|  | Greedy item LCB | 0.5948 | 0.3983 | 0.0482 |
+|  | Hierarchical framework | 0.6140 | 0.3943 | 0.0557 |
+| weak_gap (37) | Association | 0.5542 | **0.9297** | 0.0797 |
+|  | Greedy item LCB | **0.3719** | 0.6291 | 0.0185 |
+|  | Hierarchical framework | 0.4859 | 0.5531 | 0.0329 |
+
+在 `identifiable_gap` 中，framework 相对 association 的平均 regret reduction 为 `0.5059 ± 0.0811`，但 net-utility delta 为 `+0.0481 ± 0.0807`，95% seed-level CI 仍跨 0；因此应写“平均改善且方向稳定地降低 regret”，不能写成所有 seed 的净效用显著胜出。相对 greedy item LCB，regret reduction 为 `0.0414 ± 0.0449`，net-utility delta 为 `+0.0690 ± 0.0416`；framework 在 70.4% seeds 同时降低 regret，74.1% seeds 提高净效用。相对 association，两项同时改善的 seed 比例为 48.1%。
+
+### 5.4 主张对应的证据
+
+| 主张 | 证据 | 结论 |
+| --- | --- | --- |
+| 关联共现会误导选择 | association 在 core_endogenous 的 regret/harmful selection 高于干预策略 | 支持受控机制命题 |
+| 分层结构可降低 regret | identifiable_gap 中 framework 比 association 和 greedy item 的平均 regret 更低 | 条件性支持 |
+| 结构不应无条件启用 | noisy_decomposition、weak_structure 和 weak_gap 中无净效用优势 | 明确边界 |
+| 观察 gate 有成本价值 | semantic_aligned_stationary 中 framework 的 cost 低于无 gate，但仍不及 association | gate 是成本控制，不是普遍性能保证 |
+| 无人工标签/逐域调参仍可运行 | protocol flags + shared stream hash + randomized group permutation | 工程协议支持 |
+
+## 6. 解释、失败模式与后续改进
+
+### 6.1 为什么完整框架不等于“每项指标最佳”
+
+完整 framework 引入了 gate 和 probe cost，目标是风险—效用折中，而不是 oracle regret。`hierarchical_no_gate` 在一些 gap 场景的 regret 略低，说明 observational agreement gate 会跳过部分本可获益的探测；它在 gap 缺失时节省成本，但在结构确实有用时可能牺牲少量识别机会。这种代价必须通过 cost frontier 和 gate ablation 报告。
+
+### 6.2 结构错误是第一类失败
+
+当 decomposition accuracy 低或 group coherence 弱时，组级证据会被错误传播，harmful selection 上升。系统的工程补救不是调高组级权重，而是：
+
+1. 使用 Gate A 的表示质量与置信度校准；
+2. 进行跨层效应符号检查；
+3. 对稳定负效应触发 item-level veto；
+4. 回退到 raw evidence 或 item-level causal。
+
+### 6.3 内生性如何被缓解，而不是被“消除”
+
+解构本身不能消除内生性；它只把整体轨迹 treatment 拆成更接近可定义干预的局部组件，并保留来源与作用域。内生性仍需通过处理前条件、propensity、overlap、DR/MSM/OPE、负对照和主动干预来诊断。所谓“因果骨架”在本文中只能指通过这些资格门后、在有限 scope 内稳定的关系骨架。
+
+### 6.4 “共现”不应被全部惩罚
+
+关联信息有两种可能：
+
+- 轨迹特定、低质量、由曝光策略诱发的弱关联，适合降权或衰减；
+- 多次独立、高质量、跨环境复现的关联，可能趋近稳定规律，适合条件保留。
+
+因此，治理目标不是“因果保留、共现删除”，而是“对证据强度、作用域、风险和不确定性进行分层访问控制”。
+
+## 7. 复现与文件清单
+
+- 最新方案：`00-最新版框架完整设计与实验方案.md`；
+- 正式结构泛化 JSON：`实验资产/结构泛化实验/results/structural_generalization_topology_v2_1.json`；
+- 运行脚本：`结构泛化实验/structural_generalization_benchmark.py`；
+- 单元测试：`结构泛化实验/test_structural_generalization_benchmark.py`；
+- 旧版固定 6×3 结果：`results/structural_generalization_fixed6x3_v1.json`；
+- 拓扑 smoke：`results/structural_generalization_topology_smoke_v2.json`；
+- 三个英文框架图及 Mermaid/HTML 源：`框架图/`。
+
+运行正式结果：
+
+```powershell
+cd "实验资产\结构泛化实验"
+python -m unittest -v test_structural_generalization_benchmark.py
+python structural_generalization_benchmark.py --output ".\results\structural_generalization_topology_v2_1.json" --quiet
+```
+
+## 8. 最终审计结论
+
+当前证据支持的最强表述是：**在轨迹条件化的关联过拟合存在、组件组可被自动解构到足够相干、且反事实干预成本可承受的条件下，任务先行的层级探测与风险敏感治理显示出结构性优势；当 gap 缺失或结构/识别条件失败时，简单关联或项级基线可以更优。**
+
+这一定义回应了 Introduction 中的 Research Gap 1 和 Gap 2，同时避免把已有因果预印本已经覆盖的局部干预能力重新包装成空白。下一阶段真正的 Go/No-Go 取决于 Gate A、统一 reader 的公开 benchmark 端到端结果和长 horizon 的可恢复治理实验。
