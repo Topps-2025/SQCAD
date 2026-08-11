@@ -11,6 +11,6 @@ Expected database layout:
 - `results/`: generated experiment outputs and reports;
 - `manifests/`: frozen metadata, hashes, provenance and protocol manifests;
 - `tmp/`: temporary downloads and conversion outputs;
-- `archive/`: superseded drafts and non-core artifacts.
+- `archive/`: superseded data snapshots and non-core artifacts. Chinese research drafts are versioned in `docs/docs_zn/`, grouped by research philosophy, prior work and pain points, core questions and framework design, data and experiments, writing, progress, and miscellaneous drafts.
 
 Set `SQCAD_DATABASE_ROOT` when running experiments on another machine. Do not commit the external database to GitHub.

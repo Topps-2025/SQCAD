@@ -30,7 +30,7 @@ SQCAD/
 ├── tools/              # validation utilities
 └── docs/
     ├── docs_en/        # English research and presentation documents
-    └── docs_zn/        # Chinese research notes and evidence records
+    └── docs_zn/        # Chinese research notes, drafts and evidence records
 ```
 
 ## Quick start
@@ -61,8 +61,12 @@ Large assets are stored under `D:\Engineering\SQCAD\database`; see [DATA_STORAGE
 - English method: [docs/docs_en/01_method.md](docs/docs_en/01_method.md)
 - English experiments: [docs/docs_en/02_experiments.md](docs/docs_en/02_experiments.md)
 - English data and baselines: [docs/docs_en/03_data_and_baselines.md](docs/docs_en/03_data_and_baselines.md)
-- Chinese research overview: [docs/docs_zn/00_研究总览.md](docs/docs_zn/00_研究总览.md)
-- Chinese experiment plan: [docs/docs_zn/01_实验与基线方案.md](docs/docs_zn/01_实验与基线方案.md)
+- Chinese research map: [docs/docs_zn/00-研究总图.md](docs/docs_zn/00-研究总图.md)
+- Chinese research philosophy: [docs/docs_zn/01-研究理念/00-图谱入口.md](docs/docs_zn/01-研究理念/00-图谱入口.md)
+- Chinese prior work and pain points: [docs/docs_zn/02-现有工作与痛点/00-图谱入口.md](docs/docs_zn/02-现有工作与痛点/00-图谱入口.md)
+- Chinese core questions and framework design: [docs/docs_zn/03-核心问题与框架设计/00-图谱入口.md](docs/docs_zn/03-核心问题与框架设计/00-图谱入口.md)
+- Chinese data and experiments: [docs/docs_zn/04-数据与实验/01-实验总方案与基线.md](docs/docs_zn/04-数据与实验/01-实验总方案与基线.md)
+- Chinese drafts and experiment records: [docs/docs_zn/07-杂项草稿与实验记录/](docs/docs_zn/07-杂项草稿与实验记录/)
 
 ## Status
 

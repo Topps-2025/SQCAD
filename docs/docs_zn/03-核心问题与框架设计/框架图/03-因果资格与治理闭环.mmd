@@ -1,0 +1,31 @@
+stateDiagram-v2
+  [*] --> Proposed: PathBundle + mechanism hypothesis
+  Proposed --> Auditable: provenance / scope / version complete
+  Auditable --> Estimable: treatment fixed + propensity overlap
+  Estimable --> Supported: effect interval crosses materiality threshold
+  Supported --> StableScoped: direction stable across predefined environments
+  StableScoped --> CausalQualified: negative controls and rule–evidence checks pass
+
+  Proposed --> Unresolved: representation conflict
+  Auditable --> NonIdentifiable: overlap / ESS failure
+  Estimable --> Conflicted: effect direction conflict
+  Supported --> OutOfScope: task / actor / time / tool mismatch
+  StableScoped --> Conflicted: drift or version reversal
+  CausalQualified --> StableScoped: new evidence widens uncertainty
+  CausalQualified --> OutOfScope: scope changes
+
+  Unresolved --> Proposed: reparse / audit
+  NonIdentifiable --> Auditable: exploration or safe replay
+  Conflicted --> Estimable: stratified estimate / cluster intervention
+  OutOfScope --> Auditable: requalify in new scope
+
+  CausalQualified --> Protected: scope matches
+  StableScoped --> ConditionalKeep: stable association / partial support
+  NonIdentifiable --> ConservativeKeep: high forgetting cost
+  Unresolved --> Isolated: unsafe by default
+  Conflicted --> Isolated: conflict unresolved
+  ConditionalKeep --> Downweighted: aging / low incremental value
+  Downweighted --> Archived: leave hot index
+  Archived --> Restored: new task / evidence / drift reversal
+  Isolated --> Restored: conflict resolved / access restored
+  Restored --> Auditable: re-enter qualification

@@ -1,0 +1,57 @@
+flowchart TB
+  classDef svc fill:#EAF3FF,stroke:#2F6FB3,color:#173B63,stroke-width:1.3px;
+  classDef core fill:#FFF3DC,stroke:#B36B00,color:#603B00,stroke-width:2.2px;
+  classDef control fill:#F5ECFF,stroke:#7744A1,color:#45245F,stroke-width:1.6px;
+  classDef db fill:#F2F5F7,stroke:#667480,color:#2D343B,stroke-width:1.2px;
+  classDef invariant fill:#FFF0F0,stroke:#A84747,color:#642727,stroke-width:1.5px;
+
+  subgraph ONLINE["ONLINE DATA PLANE · low latency and deterministic fallbacks"]
+    EW["Event Writer"]:::svc --> WG["Write Gate"]:::svc --> RT["Candidate Retriever"]:::svc
+    TA["Task Analyzer"]:::core --> BS["Unified VOI Budget Scheduler"]:::core
+    RT --> LD["Lazy Decomposer"]:::core --> PC["Path Composer"]:::core --> CP["BCPS"]:::core
+    BS --> LD
+    BS --> CP
+    CP --> WP["Workspace Policy"]:::core --> AR["Fixed Agent Runner"]:::svc
+    AR --> EV["Evaluator"]:::svc --> DL["Atomic Decision Logger"]:::svc
+  end
+
+  subgraph OFFLINE["OFFLINE CONTROL PLANE · identification, qualification, and policy validation"]
+    LQ["Log / Representation QA"]:::control --> EST["Causal Estimator<br/>DR · MSM · OPE"]:::core
+    EST --> MI["Micro-Intervention Runner"]:::control --> QS["Qualification State Machine"]:::core
+    QS --> GOV["Governance Controller"]:::core --> IX["Index Projector + Outbox"]:::control
+    RP["Audit Replayer"]:::control --> EST
+    GOV --> RP
+  end
+
+  subgraph STORAGE["TRANSACTIONAL STORAGE AND DERIVED INDEXES"]
+    EJ[("event_journal")]:::db
+    MC[("memory_candidate")]:::db
+    CM[("committed_memory")]:::db
+    FR[("factor_relation_sidecar")]:::db
+    PB[("path_bundle")]:::db
+    DE[("decision_log")]:::db
+    EP[("effect_posterior")]:::db
+    GS[("governance_state")]:::db
+    HI[("hot_index")]:::db
+    CA[("cold_archive")]:::db
+  end
+
+  DL --> LQ
+  EW --> EJ
+  WG --> MC
+  WG --> CM
+  LD --> FR
+  PC --> PB
+  DL --> DE
+  EST --> EP
+  QS --> GS
+  IX --> HI
+  IX --> CA
+  HI -. "next task" .-> RT
+  CA -. "restore" .-> CM
+
+  INV["SYSTEM CONTRACT<br/>evidence-preserving · pre-treatment propensity<br/>degradable abstractions · reversible governance<br/>raw-retrieval fallback"]:::invariant
+  INV --- ONLINE
+  INV --- OFFLINE
+  INV --- STORAGE
+

@@ -1,0 +1,71 @@
+flowchart LR
+  classDef input fill:#EAF3FF,stroke:#2F6FB3,color:#173B63,stroke-width:1.4px;
+  classDef online fill:#ECF8F0,stroke:#2F7D4A,color:#17452A,stroke-width:1.4px;
+  classDef structure fill:#EAF7F7,stroke:#28777E,color:#18464A,stroke-width:2.2px;
+  classDef causal fill:#FFF3DC,stroke:#B36B00,color:#603B00,stroke-width:2.2px;
+  classDef govern fill:#F5ECFF,stroke:#7744A1,color:#45245F,stroke-width:2.2px;
+  classDef store fill:#F2F5F7,stroke:#667480,color:#2D343B,stroke-width:1.2px;
+  classDef gate fill:#FFF0F0,stroke:#A84747,color:#642727,stroke-width:2.2px;
+
+  subgraph F["1 · Memory formation and indexing"]
+    H["Observation · action · feedback · outcome"]:::input
+    EJ["Event Journal<br/>immutable evidence"]:::store
+    ID["Evidence-grounded ingestion<br/>entities · attributes · actions · outcomes"]:::structure
+    WR["Memory Writer<br/>deduplication · conflict · versioning"]:::online
+    MC["Memory Candidate<br/>provisional value"]:::online
+    CM["Committed Memory<br/>default retrieval"]:::online
+    SC["Relation / scope sidecar<br/>derived, traceable, degradable"]:::structure
+    H --> EJ --> ID --> WR -->|write gate| MC -->|promotion gate| CM
+    ID -. "lineage" .-> SC
+    WR -. "index projection" .-> SC
+  end
+
+  subgraph O["2 · Online task-conditioned memory use · CORE FRAMEWORK"]
+    Q["Current task<br/>goal · constraints · risk · ambiguity"]:::input
+    TA["Task Analyzer<br/>actions · losses · scope"]:::structure
+    VOI["Unified VOI Budget Scheduler<br/>risk × uncertainty × information"]:::gate
+    RET["Candidate Retrieval<br/>raw BM25 / dense / RRF + sidecar"]:::online
+    LD["Lazy Memory Decomposition<br/>entity · attribute · action · outcome"]:::structure
+    PB["Local PathBundle / Hyperedge<br/>evidence · provenance · scope"]:::structure
+    BCPS["BCPS<br/>group probe → item probe<br/>posterior update → VOI stop"]:::causal
+    WP["Workspace Policy<br/>expose · mask · replace · cluster intervention"]:::causal
+    Q --> TA --> VOI
+    CM --> RET --> LD --> PB --> BCPS --> WP
+    TA --> RET
+    VOI --> BCPS
+  end
+
+  subgraph A["3 · Agent execution and atomic logging"]
+    AG["Fixed Agent Stack<br/>reader · planner · tools"]:::input
+    ACT["Adoption & Action<br/>use / ignore · plan · act"]:::input
+    OUT["Outcome Evaluator<br/>utility · loss · risk · cost"]:::online
+    DL["Decision Log<br/>candidate → exposure → adoption → action → outcome<br/>propensity recorded before treatment"]:::store
+    WP --> AG --> ACT --> OUT --> DL
+  end
+
+  subgraph C["4 · Offline causal qualification"]
+    QA["Log & Representation QA<br/>overlap · ESS · parser reliability"]:::store
+    EP["Effect Posterior<br/>DR · MSM · OPE · micro-intervention"]:::causal
+    CQ["Scoped Causal Qualification<br/>estimable → supported → stable-and-scoped"]:::causal
+    DL --> QA --> EP --> CQ
+  end
+
+  subgraph G["5 · Recoverable lifecycle governance"]
+    GOV["Risk-Sensitive Governance<br/>protect · keep · downweight · archive · isolate · restore"]:::govern
+    ES["Evidence Survival<br/>retention · legality · audit"]:::store
+    RB["Relation Belief<br/>effect · uncertainty · scope"]:::causal
+    AP["Access Policy<br/>priority · hazard · budget"]:::govern
+    CA["Cold Archive"]:::govern
+    HI["Hot Index"]:::store
+    CQ --> GOV
+    GOV --> ES
+    GOV --> RB
+    GOV --> AP
+    GOV --> CA
+    AP --> HI
+  end
+
+  HI -. "next-task candidate stream" .-> RET
+  CA -. "restore" .-> CM
+  CQ -. "path prior update" .-> BCPS
+  OUT -. "write and identification value" .-> MC
