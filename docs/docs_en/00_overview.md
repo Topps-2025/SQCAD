@@ -1,4 +1,4 @@
-﻿# SQCAD overview
+# SQCAD overview
 
 ## Research question
 
@@ -12,9 +12,10 @@ SQCAD asks a narrower question:
 
 SQCAD separates:
 
-- **Evidence**: immutable source records and provenance;
-- **Qualification**: scope- and version-specific positive, negative or unresolved permission;
-- **Access**: per-task budget allocation among candidates.
+- **Evidence**: immutable source records and provenance, with censoring awareness (silence caused by archive is not evidence of low value);
+- **Qualification**: scope- and version-specific identification states `{point, bound, unresolved, mismatch}` that authorize — or refuse — persistent change;
+- **Access**: per-task budget allocation among candidates, with keep / downweight / archive / restore / probe as formal, reversible actions;
+- **Decision**: a commit requires provable qualification — the identification set must not cross the action boundary, or the cost comparison `min{ R*(L,U), C_defer, C_probe + R*_after }` selects commit.
 
 The system follows three rules:
 
@@ -24,10 +25,12 @@ The system follows three rules:
 
 Qualification is conditional, not global. A memory can be positive in one task/user/tool/version scope and unresolved or mismatched in another. This is a hypothesis about conditional denoising, not a proven guarantee against overfitting.
 
-## Evidence boundary
+## Theory and evidence boundary
 
-Controlled simulations and engineering tests support mechanism-level claims only. LongMemEval retrieval has been run locally; LoCoMo data is locally frozen; full public end-to-end comparison against strong memory-governance systems remains a separate verification stage. This project does not currently claim state-of-the-art performance.
+The framework is reverse-derived from formal results (`docs/研究逻辑与理论证明/`): identification gaps (Theorems 1–2, Corollary 1), a self-obscuring lifecycle theorem — committed policies without a recovery channel have regret Θ(T) while qualified recovery achieves O(1/qρ) (T1, `15-…`) — reduction separation from standard bandit/OPE (T2, `16-…`), and minimax probing lower bounds with matching-order upper bounds (P4).
+
+Controlled simulations and engineering tests support mechanism-level claims only. LongMemEval retrieval has been run locally; LoCoMo data is locally frozen; full public end-to-end comparison against strong memory-governance systems remains a separate verification stage (plan: `docs/研究逻辑与理论证明/17-…`). This project does not currently claim state-of-the-art performance.
 
 ## Repository and database
 
-Core code and lightweight documents live in the C-drive repository. Large corpora, models, generated results and archives live in the external database described in `DATA_STORAGE.md`.
+Core code and lightweight documents live in the C-drive repository. Large corpora, models, generated results and archives live in the external database described in `DATA_STORAGE.md`. Baseline open-source status and CPU/no-GPU reproduction analysis: `docs/BASELINE_AUDIT.md`.

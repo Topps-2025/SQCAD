@@ -35,6 +35,16 @@ The implementation may use a discrete top-k or sparse projection, but the main e
 
 The online path records candidate generation, exposure, position, adoption, action, outcome and cost. Ordinary outcomes update association only. Qualification updates occur asynchronously through auditable evidence, randomized low-risk interventions or human review. Scope shifts, version changes and conflicts trigger revalidation. Evidence, belief and access are stored separately so that an incorrect access decision can be reversed without erasing the source.
 
+## Decision layer
+
+A persistent commit requires provable qualification. With identification bounds `(L, U)` from the qualification layer, the decision rule compares three options under one cost contract:
+
+```text
+min{ R*(L,U),  C_defer,  C_probe + R*_after_probe }
+```
+
+where `R*(L,U) = U(−L)/(U−L)` is the minimax regret of committing. The identification set must not cross the action boundary; otherwise the action stays unresolved, defers, or pays for a probe/restore that reopens the evidence channel. Archive-induced silence is censoring, not negative evidence: evidence starvation caused by a past action must be distinguishable from true non-value before any further decay.
+
 ## Complexity and boundary
 
 The shared retriever, writer, reader, LLM and evaluator are infrastructure rather than claimed novelty. SQCAD does not claim causal discovery from observational success, universal transport across scopes, permanent global retention or physical deletion.

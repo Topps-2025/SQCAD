@@ -1,4 +1,4 @@
-# SQCAD 项目进度审计（2026-08-13）
+﻿# SQCAD 项目进度审计（2026-08-13）
 
 > 本审计回答三个问题：(1) 从哪些文献读出 research gap 假设，并转化为了哪些研究理念、工作与痛点；(2) gap 是如何被设计成可证伪命题并以实验证明立住的，为什么现有工作无法覆盖、基线工作是什么；(3) 定理形式化、证明、框架反推、条件充分性/必要性与框架成本收益分别由哪些实验支撑。
 >
@@ -96,6 +96,10 @@
 
 ## 四、进度台账
 
+### 4.0 新增的客观性约束
+
+公开数据集阶段的主结果不允许依赖我们手工定义的“应保留/应删除”金标。主结果使用原生答案、支持证据、时间顺序、未来事实更新和统一成本日志自动计算；Gate A 等人工标注只做盲法机制审计与子集分层，不参与测试集调参、不作为总体 SOTA 分数。该约束已写入 `17-SQCAD公开数据集落地与框架实验方案-20260813.md`。
+
 | 模块 | 状态 | 证据/代码 | 下一步 |
 |---|---|---|---|
 | Gap 反例（命题 A/B/C + 公平性审查） | ✅ 完成 | `01`/`02`、`gap_proof_experiments.py` | — |
@@ -115,15 +119,17 @@
 | **reduction controls（实验 B，14- §7.2）** | ✅ 完成 | `实验证据链/13` §4 | T2 反证的数值侧；W0/W1 有效、W2 精确线性 |
 | **T2 严格化 + P4 minimax 下界（评审回应批）** | ✅ 完成（严格证明 + 数值佐证） | `16`、`实验证据链/14`、`reduction_closure.py`（16 项新测试）、`self_obscuring_ablation.py`（random_flip/oracle 控制） | 配对恒等式任意策略逐位精确；忠实像上 Θ(T)；禁止 φ 控制成功；N* 下界与后悔分解全格点成立；阶匹配（绑定 regime 常数因子） |
 | 外部 rollout（chronological future） | ⏸ 阻塞（模型端点） | `00 实验证据链` 未验证清单 | — |
+| 公开数据集客观治理比较 | ⏳ 方案已定、实施未完成 | `17-SQCAD公开数据集落地与框架实验方案-20260813.md` | LongMemEval-S 主集 + LoCoMo 复验；统一合同、同一 reader/evaluator、无手工金标依赖 |
+| **公开数据集落地准备批（本批）** | ✅ 完成 | `18-基线开源状态与无GPU复现审计-20260813.md`、`docs/BASELINE_AUDIT.md`、`tools/render_framework_diagram.py` | ①核心源码冻结（255 测试通过 + 四件套清单重生成，聚合 `badbb886…`，code 46/results 25/reports 11）；②框架工程图 13-（Evidence→Qualification→Access→Decision→Lifecycle，含 T1/T2/P4 之后的 censoring-aware 语义与 restore/probe 通道，渲染脚本入仓库）；③GitHub 展示层组建（README 重写、docs_en 更新、CITATION.cff）；④12 个 R3 基线 + 4 个基准数据集逐一网络核查（结论：仅 ActMem 真 GPU 阻塞；其余 API-key 阻塞或纯 CPU；Oblivion 代码公开但 NEC 专有许可；FadeMem/Memory Worth/DeMem/Trivium/GovMem 无官方代码；LoCoMo 官方 F1 无 judge LLM 可纯 CPU 评分） | 按 17 §5 先做 D1/D2 检索协议（可全 CPU）与 LoCoMo 离线 F1；Oblivion/SimpleMem 非 LLM 机器离线验收 |
 | 论文写作（Introduction 规范稿等） | ✅ 已有草稿 | `07-Introduction规范稿` | 声称压缩最后做 |
 
-**测试与工程状态**：全套 **255 项测试通过**（239 + 16 新）；`results/`（gitignored）与 D 盘外部数据库同步；冻结清单 `freeze_manifest.json` 待本批内容更新后重新生成（代码 + 配置 + 结果 + 报告）；GitHub 已推送（commit 7d964c8 起）。
+**测试与工程状态**：全套 **255 项测试通过**（239 + 16 新）；`results/`（gitignored）与 D 盘外部数据库同步（34 个 JSON）；冻结清单 `freeze_manifest.json` **已重新生成**（聚合 SHA-256 `badbb886d0e878126cd6aa8582fe7d43f0f307dce67c1a4f4e1ce758a94f9b61`；code 46 / config registry + 两冻结数据集字节哈希 / results 25 / reports 11）；公开数据集主表尚未冻结，不能把当前受控 runner 结果写成外部 SOTA。
 
 ---
 
 ## 五、阻塞清单
 
-1. **R3 基线复现**：无 NVIDIA GPU、无 OpenAI/Anthropic/Azure/HF API key（环境事实，非省略）；
+1. **R3 基线复现**：无 NVIDIA GPU、无 OpenAI/Anthropic/Azure/HF API key（环境事实，非省略）。`18-` 审计细化：**GPU 不是主要墙、API key 才是**——12 个系统中仅 ActMem（Qwen3-Embedding-8B）被 GPU 卡死；SimpleMem/Oblivion/CMI 的非 LLM 机器（单测、数据 reader、检索组件）现在即可离线验收，缩小日后只剩端点的缺口；
 2. **外部 QA 层端到端**：GPT-4o-mini 端点（`06` 如实标注）；
 3. **trace-grounded 主表**：`06` §7.1 下一步（无模型端点也可做，是最近的现实接地增量）；
 4. **GoodAI-LTM / MemoryAgentBench 数据**：R2 阻塞。
@@ -132,7 +138,9 @@
 
 1. **主张升级判定已更新**（本批）：验收条件 1（T1 依赖审查结构、去结构失效）、2（T2 reduction separation）严格满足，3 **现已全部严格满足**（T1(b) 上界严格 + 定理 3/4 探测 minimax 下界严格，`16`；数值佐证 `实验证据链/14`）——"三项中两项"最低条件已远超；据此推进 SQCAD 框架设计（Evidence/Qualification 层的 censoring-aware 语义、restore channel 的 cost-aware 决策——`13` 报告 §5 的 cost_aware 规则数值验证已在框架方向内）；
 2. **P4 已完成**（本批：定理 3 检测下界 + 定理 4 后悔分解 + 推论 4 阶匹配，`16` §2；数值 `实验证据链/14` §4–5）；T2 已完成（`16` §1；`15` §3 升级标注）；
-3. P0 遗留：authorization certificate 形式化（soundness/verifiability/non-triviality）与 Theorem 4(c′) 收紧；
+3. P0 遗留：authorization certificate 形式化（soundness/verifiability/non-triviality）与 Theorem 4(c′) 收紧；该遗留不阻塞公开数据集客观治理比较，但限制“完整授权理论”的表述。
 4. P2 对接成本合同：C_probe ← Gate 4 的 λ_probe·E[probes] 估计，重算边界表；
 5. 长线下游（最近的现实接地增量）：**trace-grounded chronological 实验**（验收 6/7：时间先后 + 因果优先于观察依赖，无模型端点可做）、外部 rollout、声称压缩（最后做）；
-6. 每批补充后：全量测试 → 重新生成四件套冻结清单 → 同步 D 盘 → 提交推送（本批：16- 理论文档、`实验证据链/14` 报告、`reduction_closure.py` 模块与 16 项测试、15- 升级标注、审计更新，待提交）。
+6. 公开数据集落地时先完成客观性 gate：冻结 candidate stream、future split、reader/evaluator、成本合同和基线版本；人工标注仅作盲法机制审计，不能替代客观主表；
+7. 每批补充后：全量测试 → 重新生成四件套冻结清单 → 同步 D 盘 → 提交推送。
+

@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software or its evidence chain, please cite it as below."
+title: "SQCAD: Scope-Qualified Competitive Access Decay for evidence-governed Agent Memory"
+type: software
+repository-code: "https://github.com/Topps-2025/SQCAD"
+license: MIT
+abstract: >-
+  Research prototype for governing the future access of Agent Memory under a
+  fixed workspace budget. SQCAD separates evidence records, scope-qualified
+  permission (point/bound/unresolved/mismatch) and competitive access
+  projection, with reversible archive and paid restore/probe channels. The
+  framework is reverse-derived from formal results on memory-specific
+  identification gaps, self-obscuring lifecycle dynamics and minimax probing
+  lower bounds.
+keywords:
+  - agent memory
+  - memory governance
+  - causal identification
+  - lifecycle value
+  - selective forgetting
+  - memory benchmarks
+version: 0.1.0
+date-released: 2026-08-13
