@@ -7,7 +7,7 @@ paper_type: algorithmic-method
 target_venue: ICLR 2027
 intro_source: ../07-Introduction规范稿.md
 framework_source: 00-最新版框架完整设计与实验方案.md
-formal_evidence: 实验资产/最小框架挑战实验/最小框架挑战正式实验报告-v3.md
+formal_evidence: ../../草稿-draft/实验报告/最小框架挑战正式实验报告-v3.md
 ---
 
 # Introduction 之后的框架设计与实验执行方案
@@ -295,4 +295,4 @@ formal_evidence: 实验资产/最小框架挑战实验/最小框架挑战正式�
 
 我们的正式反例给出的答案是“没有”。最小方法因此围绕 qualification permission 构建：廉价共现仍可用于低风险当前任务，付费干预只为少数候选产生资格，资格通过后才允许在明确 scope 下执行非对称、可撤回的访问治理。当前唯一被实验直接支持的是这条权限门；其余模块均接受删除。
 
-完整公式、日志 schema、Go/No-Go 和复现入口见 `00-最新版框架完整设计与实验方案.md`；正式数值见 `实验资产/最小框架挑战实验/最小框架挑战正式实验报告-v3.md`。
+完整公式、日志 schema、Go/No-Go 和复现入口见 `00-最新版框架完整设计与实验方案.md`；正式数值见 `../../草稿-draft/实验报告/最小框架挑战正式实验报告-v3.md`。

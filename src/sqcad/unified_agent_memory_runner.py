@@ -42,12 +42,17 @@ class Candidate:
     item_effect_lcb: float
     group_effect_lcb: float
     token_cost: int
+    # shared-stream retrieval inputs: the lexical content and the semantic
+    # label tokens are part of the candidate stream, identical for every
+    # policy (BM25/dense/RRF are deterministic functions of them).
+    content_tokens: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class Task:
     task_id: str
     required_group: str
+    query_tokens: Tuple[str, ...] = ()
 
 
 def canonical_hash(value: object) -> str:
@@ -55,10 +60,13 @@ def canonical_hash(value: object) -> str:
     return hashlib.sha256(payload).hexdigest().upper()
 
 
+EFFECTS = {"rare_critical": 2.5, "common_useful": 1.0, "stale": -1.0, "noise": 0.0}
+
+
 def build_episode(seed: int, group_noise: float, steps: int) -> Tuple[List[Candidate], List[Task]]:
     rng = random.Random(seed)
     group_sizes = {"rare_critical": 4, "common_useful": 8, "stale": 8, "noise": 12}
-    effects = {"rare_critical": 2.5, "common_useful": 1.0, "stale": -1.0, "noise": 0.0}
+    effects = EFFECTS
     candidates: List[Candidate] = []
     groups = list(group_sizes)
     for group, size in group_sizes.items():
@@ -79,6 +87,11 @@ def build_episode(seed: int, group_noise: float, steps: int) -> Tuple[List[Candi
                 recency, frequency, success = rng.uniform(10, 90), rng.uniform(5, 45), rng.uniform(0.55, 0.90)
                 item_lcb = rng.uniform(-0.20, 0.15)
             group_lcb = effects[semantic_group] + rng.gauss(0.0, 0.08)
+            content_tokens = (
+                f"tok_{group}",                 # lexical trace of true content
+                f"tok_{semantic_group}",        # semantic label in the text
+                f"item_{index:02d}",
+            )
             candidates.append(Candidate(
                 memory_id=f"{group}_{index:02d}",
                 true_group=group,
@@ -90,12 +103,14 @@ def build_episode(seed: int, group_noise: float, steps: int) -> Tuple[List[Candi
                 item_effect_lcb=item_lcb,
                 group_effect_lcb=group_lcb,
                 token_cost=20 + rng.randrange(21),
+                content_tokens=content_tokens,
             ))
     tasks = []
     for step in range(steps):
         draw = rng.random()
         required = "rare_critical" if draw < 0.30 else "common_useful" if draw < 0.85 else "none"
-        tasks.append(Task(f"task_{step:04d}", required))
+        query_tokens = () if required == "none" else (f"tok_{required}",)
+        tasks.append(Task(f"task_{step:04d}", required, query_tokens))
     return candidates, tasks
 
 

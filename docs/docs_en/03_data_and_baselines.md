@@ -26,9 +26,10 @@ Every main-table comparison uses the same candidate stream, reader, prompt, mode
 
 ## Reachability snapshot
 
-- LongMemEval repository: MIT; local data and upstream commit are frozen.
+- LongMemEval: ICLR 2025; MIT repository; local S/Oracle data and upstream commit are frozen. The M split is still missing locally.
 - LoCoMo repository: public, but GitHub metadata reports `NOASSERTION`; verify `LICENSE.txt` and data terms before redistribution.
 - GoodAI-LTM: public runner and configurations; model/judge endpoint and third-party data terms require verification.
 - Oblivion: local source snapshot; Python 3.12, Poetry and API endpoints are required for full benchmarks.
-- FadeMem/SimpleMem: public code exists, but repository-paper correspondence and endpoint/model requirements must be audited before claims of reproduction.
+- SimpleMem: the current main branch contains post-paper Omni/EvolveMem changes. Commit `16912523f6f0de10c01f7701cdbb79d8fa4f5280` (`released version`, 2026-01-02) is frozen separately as the original paper-release candidate. Its LoCoMo protocol requires GPT-4.1-mini or Qwen and Qwen3-Embedding-0.6B.
+- FadeMem: the previously found `aniki-ly/FadeMem` repository is arXiv:2606.10671 for autoregressive video diffusion, not the cited Agent Memory forgetting paper arXiv:2601.18642. It is an identity mismatch and is excluded from the baseline table until the official Agent Memory implementation is verified.
 - DeMem: the currently found repository is not yet verified as the official paper implementation.
