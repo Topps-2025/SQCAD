@@ -74,7 +74,7 @@
 | Theorem 4 | 未识别类上 committing 规则最坏情况 regret ≥ \|τ₁\|\|τ₂\|/(\|τ₁\|+\|τ₂\|)、错误概率 ≥ 1/2；突破需拒绝或新证据 | 双世界实例：660 @ p=0.6；错误 ≥ 0.5；门控 0 | ✅ 证明 + 计算验证（两点构造版） |
 | Theorem 4(c′)→审计性 | 拒绝触发必须可验证 | 论证成立但 13- 指出需独立形式化（authorization certificate：soundness/verifiability/non-triviality） | ⚠️ 待升级（P0） |
 | **T1 self-obscuring lifecycle theorem**（14- §6；严格证明 `15`） | (a) 任意无恢复 committing 策略在错误审查世界 R_T = τ·p·(T−n_early) = Θ(T)（精确斜率 5.85 = 10×0.6×1950/2000）；(b) q>0 恢复 ⇒ E[R_T] ≤ O(1/(qρ))，与 T 无关；(c) p_arch=p 时下界消失 | W0–W3 消融（`实验证据链/13`）：W2 精确 5.8500 vs W0 0.0440（去审查即失效）；恢复平台 0.4250；restore sweep 单调（corr 818/142/37） | ✅ 严格证明（引理 1/2 + 定理 1，15-）+ 12-seed 数值 |
-| **T2 reduction separation**（14- §7.2；反证 `15`） | 若标准 bandit/OPE 能表达修正，则无需 evidence-availability/lineage/restore 状态；censoring 破坏 overlap 使反证成立 | controls：W0/W1 全部有效（slope ≤0.075），W2 全部精确 5.8500（OPE archived 侧仅共因早期行 25.1、keep 侧 0；UCB 零行） | ✅ 数值 + argument-level 反证（15- 如实标注） |
+| **T2 reduction separation**（14- §7.2；严格证明 `16`） | 任何忠实 feedback-preserving reduction（定义 1：动作集合/即时 reward/观测信息保持 + φ 世界无关 + 保真）若不加证据可得性状态，则 max regret ≥ ½τp(T−n_early) = Θ(T)（定理 2；配对恒等式 regret_K+regret_A ≡ τp(T−n_early) 对任意策略逐点成立，引理 4） | controls：W0/W1 全部有效（slope ≤0.075），W2 全部精确 5.8500；`实验证据链/14`：配对恒等式 4 策略逐位精确 11700.0、忠实像上 5.8500 精确、禁止 φ 控制 0.0000、不被审查的 contextual_bandit ≈0.03 | ✅ **严格证明**（定义 1/2 + 引理 3/4 + 定理 2 + 推论 2/3，`16`）+ 12-seed 数值 |
 | Lemma A–D | C2/C3、C6、C7、C8 存在替代/退守路线（N1 不成立） | C6 bias 0.49/0.30 vs se 1.4；C7 bundle 8.97±1.12 vs 8.07；IV −0.003 vs 观测偏倚 +0.835；C8 +21.4 vs 当期 1.07 | ✅ 代码验证（**C1/C4/C5 未逐项处理，不声称全族不必要**） |
 
 ### 3.2 框架反推实验（`03`/`04` 报告）
@@ -110,13 +110,14 @@
 | **P1 一般决策识别定理**（R*(L,U)=U(−L)/(U−L)；安全提交 ⟺ 识别集不跨 0） | ✅ 完成 | `12` 定理文档 §3.6、`实验证据链/12` §3 | **Theorem 5 完整证明** + 计算验证（660 复现 @p*=0.6；决策识别非点识别实例 (500,1650) regret 0） |
 | **P2 拒绝/探测成本边界** | ✅ 完成（数值级） | `实验证据链/12` §4 | C_probe<330 探测胜 commit、<170 胜 defer；与 Gate 4 λ_probe 参数对接仍待 |
 | **P3 动态探索必要性**（Ω(T) 无探索 regret） | ✅ **严格证明完成**（T1(a)，`15`）+ 数值 | `实验证据链/13` §3/§5、`15` | W0–W3 消融：W2 精确 5.85 = τ·p·(T−n_early)/T；无恢复提交规则 5.85 精确（`13` §5）；去审查（W0）后 0.044——现象依赖审查结构 |
-| **P4 动态探索上界**（恢复 O(1/q) + 探测复杂度） | ⚠️→✅ 恢复上界严格（T1(b)，`15`）；探测 minimax 下界仍数值级 | `15` §4、`实验证据链/13` §8、`12` §6 | 恢复上界 O(1/(qρ)) 与 T 无关；sweep q=0.01/0.05/0.2 → corr 818/142/37（15- 预测 763/118/37，常数因子内一致）；KL 下界 9.36 vs 停止规则 34.6（3.7× 同阶，12-） |
+| **P4 动态探索上界 + minimax 探测下界**（恢复 O(1/q) + 探测复杂度） | ✅ **严格证明完成**（T1(b) 上界 `15`；定理 3 检测下界 N* = log(1/δ)/KL、定理 4 后悔分解下界、推论 4 阶匹配，`16`）+ 数值 | `16` §2、`实验证据链/14` §4–5、`reduction_closure.py` | 恢复上界 O(1/(qρ)) 与 T 无关；E[探测数] ≥ N* 全格点成立（绑定 regime 2.2–3.4×，与 q 无关）；E[regret] ≥ L 全格点（r/L ∈ [2.2, 3.4] 绑定 regime）；U/L：τ≤0.5 恢复类严格占优（<1）、τ=1 同阶（2.2–3.6）、强信号 regime U/L ∝ 1/N*（C(δ) 显式涵盖）；主配置 U=800 ≈ 经验 850.2（1.06×） |
 | **self-obscuring 结构消融 + self-confirming 全对比（T1/T2 机制证据链，实验 A/B）** | ✅ 完成（严格证明 + 12-seed 数值） | `实验证据链/13`、`15`、`self_obscuring_ablation.py`（15 项新测试） | 主张升级判定（14- §9：验收 1/2 严格满足、3 部分满足）→ 推进 SQCAD 框架设计 |
 | **reduction controls（实验 B，14- §7.2）** | ✅ 完成 | `实验证据链/13` §4 | T2 反证的数值侧；W0/W1 有效、W2 精确线性 |
+| **T2 严格化 + P4 minimax 下界（评审回应批）** | ✅ 完成（严格证明 + 数值佐证） | `16`、`实验证据链/14`、`reduction_closure.py`（16 项新测试）、`self_obscuring_ablation.py`（random_flip/oracle 控制） | 配对恒等式任意策略逐位精确；忠实像上 Θ(T)；禁止 φ 控制成功；N* 下界与后悔分解全格点成立；阶匹配（绑定 regime 常数因子） |
 | 外部 rollout（chronological future） | ⏸ 阻塞（模型端点） | `00 实验证据链` 未验证清单 | — |
 | 论文写作（Introduction 规范稿等） | ✅ 已有草稿 | `07-Introduction规范稿` | 声称压缩最后做 |
 
-**测试与工程状态**：全套 **239 项测试通过**（224 + 15 新）；`results/`（gitignored）与 D 盘外部数据库同步；冻结清单 `freeze_manifest.json` 待本批内容更新后重新生成（代码 + 配置 + 结果 + 报告）；GitHub 已推送（commit 7d964c8 起）。
+**测试与工程状态**：全套 **255 项测试通过**（239 + 16 新）；`results/`（gitignored）与 D 盘外部数据库同步；冻结清单 `freeze_manifest.json` 待本批内容更新后重新生成（代码 + 配置 + 结果 + 报告）；GitHub 已推送（commit 7d964c8 起）。
 
 ---
 
@@ -127,11 +128,11 @@
 3. **trace-grounded 主表**：`06` §7.1 下一步（无模型端点也可做，是最近的现实接地增量）；
 4. **GoodAI-LTM / MemoryAgentBench 数据**：R2 阻塞。
 
-## 六、下一步（按 `14-` §9 验收与 §10 执行顺序，T1/T2 机制证据链已落地）
+## 六、下一步（按 `14-` §9 验收与 §10 执行顺序；T1/T2 机制证据链 + 评审回应批已落地）
 
-1. **主张升级判定**（14- §9）：验收条件 1（T1 依赖审查结构、去结构失效）、2（T2 reduction separation）严格满足，3 部分满足（T1(b) 上界严格、探测 minimax 下界仍数值级）——按"三项中两项"最低条件已达到；据此推进 SQCAD 框架设计（Evidence/Qualification 层的 censoring-aware 语义、restore channel 的 cost-aware 决策——`13` 报告 §5 的 cost_aware 规则数值验证已在框架方向内）；
-2. P4 剩余严格化：探测复杂度 minimax 下界（与 T1(b) 上界配对的严格形式）；
+1. **主张升级判定已更新**（本批）：验收条件 1（T1 依赖审查结构、去结构失效）、2（T2 reduction separation）严格满足，3 **现已全部严格满足**（T1(b) 上界严格 + 定理 3/4 探测 minimax 下界严格，`16`；数值佐证 `实验证据链/14`）——"三项中两项"最低条件已远超；据此推进 SQCAD 框架设计（Evidence/Qualification 层的 censoring-aware 语义、restore channel 的 cost-aware 决策——`13` 报告 §5 的 cost_aware 规则数值验证已在框架方向内）；
+2. **P4 已完成**（本批：定理 3 检测下界 + 定理 4 后悔分解 + 推论 4 阶匹配，`16` §2；数值 `实验证据链/14` §4–5）；T2 已完成（`16` §1；`15` §3 升级标注）；
 3. P0 遗留：authorization certificate 形式化（soundness/verifiability/non-triviality）与 Theorem 4(c′) 收紧；
 4. P2 对接成本合同：C_probe ← Gate 4 的 λ_probe·E[probes] 估计，重算边界表；
-5. 长线下游：trace-grounded 主表（验收 6/7）、外部 rollout、声称压缩（最后做）；
-6. 每批补充后：全量测试 → 重新生成四件套冻结清单 → 同步 D 盘 → 提交推送（本批：15- 文档、`实验证据链/13` 报告、两处机制修复，待提交）。
+5. 长线下游（最近的现实接地增量）：**trace-grounded chronological 实验**（验收 6/7：时间先后 + 因果优先于观察依赖，无模型端点可做）、外部 rollout、声称压缩（最后做）；
+6. 每批补充后：全量测试 → 重新生成四件套冻结清单 → 同步 D 盘 → 提交推送（本批：16- 理论文档、`实验证据链/14` 报告、`reduction_closure.py` 模块与 16 项测试、15- 升级标注、审计更新，待提交）。

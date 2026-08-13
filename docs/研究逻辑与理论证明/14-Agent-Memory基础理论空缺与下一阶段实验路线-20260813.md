@@ -674,3 +674,346 @@ Z=(\text{estimand},\text{scope},\text{support},\text{measurement},\text{bound},\
 > 持久、可恢复、竞争性、任务漂移和证据依赖的生命周期结构，会产生 self-obscuring identification dynamics；该动力学在去掉关键结构后消失，并且不能在不增加关键状态的情况下化约为普通 bandit/OPE。
 
 如果最终框架不如基线，优先解释为方法、成本或外部效度问题；只有当理论反例、定理量词或结构不可约性本身被反驳时，才应撤回理论主张。
+
+## 16. 假设 T2 与 P4 完成后的完整理论—实验链
+
+本节假设两个剩余理论结果已经完成：
+
+- **T2 严格 reduction separation**：在保持即时 reward、动作语义和反馈语义的限制下，普通 bandit/OPE 若不显式增加 evidence-availability、lineage 或 restore state，就不能忠实表示 archive-induced evidence censoring；
+- **P4 严格 minimax 探测下界**：在相同 self-obscuring 模型类和相同成本合同下，任何策略为了以置信度 (1-delta) 区分相反最优动作世界，都必须支付至少某个 KL/信息量决定的探测成本；T1(b) 的 restore 策略达到同阶上界。
+
+在这个假设下，整篇论文可以按下面的顺序组织。
+
+### 16.1 第一步：从文献得到 Research Gap 假设
+
+#### 研究观察
+
+Agent Memory 现有工作分别处理了：
+
+- 写入、压缩、检索、衰减和遗忘；
+- 当前 query 的 memory intervention 或事后 attribution；
+- provenance、scope、版本和访问控制；
+- 程序经验、决策压缩和长期更新。
+
+但没有统一回答：
+
+1. `keep/archive/downweight/restore` 是什么 treatment；
+2. 它影响的是当前答案，还是未来生命周期 rollout；
+3. 它是否改变未来 candidate、exposure 和 feedback 机制；
+4. 什么证据有资格改变 persistent access policy；
+5. 证据不足时应 commit、defer 还是 probe/restore。
+
+#### 得到的初始假设
+
+\[
+\text{常用 memory score}
+\not\Rightarrow
+\text{持久访问生命周期价值}
+\not\Rightarrow
+\text{安全治理授权}.
+\]
+
+通俗地说：现有方法通常回答“这条记忆现在看起来有用吗”，而论文要回答“改变它未来能不能被看到，会不会改善未来一长段任务，以及我们有没有足够证据做这个改变”。
+
+此时仍只是文献驱动的 gap 假设，不是理论证明。
+
+### 16.2 第二步：固定 treatment、estimand 和观测合同
+
+把模糊的“记忆价值”固定为：
+
+\[
+A_i^{\mathrm{pers}}\in\{\texttt{keep},\texttt{archive},\texttt{downweight},\texttt{restore}\},
+\]
+
+并定义：
+
+\[
+V_s^\pi(a)
+=
+\mathbb E^\pi\left[
+\sum_{t=1}^{H}\gamma^{t-1}
+\bigl(Y_t-\lambda C_t-\rho R_t\bigr)
+\mid do(A_i^{\mathrm{pers}}=a),s
+\right].
+\]
+
+比较效应为：
+
+\[
+\tau_s^\pi(a_1,a_0)=V_s^\pi(a_1)-V_s^\pi(a_0).
+\]
+
+观测合同必须包含：
+
+- candidate generation；
+- exposure、position 和 budget；
+- adoption/usage；
+- persistent action window；
+- outcome、cost、risk；
+- source/derived lineage；
+- scope/version；
+- archive/restore history。
+
+通俗地说：如果不先说清楚“删掉以后未来十轮、百轮、两千轮会怎样”，就无法判断删除是不是正确；只看当前 query 的分数是不够的。
+
+### 16.3 第三步：用三个反例证明现有代理不够
+
+#### 反例 A：历史关联不足
+
+构造两个世界，使完整观测日志分布相同，但一条记忆在一个世界中有益、在另一个世界中有害。
+
+证明：
+
+\[
+P_{M_1}(O)=P_{M_2}(O),
+\qquad
+\tau_{M_1}>0,\;\tau_{M_2}<0.
+\]
+
+通俗地说：记忆和成功总是一起出现，不代表到底是谁起了作用；可能是旁边另一条记忆在起作用。
+
+#### 反例 B：query-local effect 不足
+
+构造两条记忆，使当前问题上的真 do-effect 完全相同，但长期价值符号相反。
+
+原因是 persistent action 会改变：
+
+- 后续候选；
+- 注意力/工作区竞争；
+- rare task 的检索桥；
+- 共同暴露和 continuation value。
+
+通俗地说：一条记忆今天帮你答题，但长期霸占工作区；另一条今天作用一样，却是未来稀有任务的唯一线索。
+
+#### 反例 C：source average 不自动 transport
+
+source 环境的平均效应不能自动授权 target 环境的访问动作，因为任务、用户、工具、模型或 evaluator 可能已经变化。
+
+三个反例完成的任务是：
+
+> 证明已有常用分数和局部因果量，哪怕估计完全正确，也不一定回答 persistent lifecycle decision。
+
+### 16.4 第四步：公平性审查，排除“只是基线太弱”
+
+反例必须给基线最有利的条件：
+
+- 日志完整；
+- 局部 do-effect 使用真值；
+- 随机化和候选流公平；
+- 两世界观测等价逐位成立；
+- 失败不是优化器、样本量或参数调节造成。
+
+如果基线在拿到正确的 local causal answer 后仍做错 lifecycle action，就说明失败来自 **estimand mismatch**，而不是 estimator bias。
+
+### 16.5 第五步：Theorem 4/5 证明“强行治理”的一般必要性
+
+令生命周期效应识别集合为：
+
+\[
+\mathcal I(o)=[L,U].
+\]
+
+若：
+
+- (L>0)，可以安全 keep；
+- (U<0)，可以安全 archive；
+- (L\le0\le U)，不同相容世界支持不同动作。
+
+跨零时，任何直接 commit 的规则都有：
+
+\[
+R^*(L,U)=\frac{U(-L)}{U-L}
+\]
+
+的 minimax regret。
+
+通俗地说：如果现有信息同时允许“应该保留”和“应该归档”两个世界，那么无论你现在选哪一个，总有一个世界会证明你选错了。
+
+这一步证明了 Qualification、defer 和 probe 不是工程偏好，而是未识别决策中的必要机制。
+
+### 16.6 第六步：引入 Agent Memory 独有的 self-obscuring 结构
+
+现在才进入基础理论的特化部分。定义最小生命周期模型：
+
+\[
+A_t^{\mathrm{access}}
+\rightarrow C_{t+1}
+\rightarrow E_{t+1}
+\rightarrow Y_{t+1}
+\rightarrow O_{t+1}^{\mathrm{evidence}}
+\rightarrow A_{t+1}^{\mathrm{access}}.
+\]
+
+关键设置：
+
+- 早期日志对 K/A 两世界逐位等价；
+- archive 会让未来 candidate/evidence support 降为零或接近零；
+- 没有 restore/probe 的 committing policy 不能生成新观测；
+- restore 可以重新打开证据通道，但需要成本。
+
+#### T1(a)：无恢复时的线性下界
+
+由早期观测等价，策略在 K/A 两世界必须做相同动作；由 archive-induced silence，错误动作后不再产生新证据；所以错误会持续整个 horizon：
+
+\[
+R_T=\tau p(T-n_{\mathrm{early}})=\Theta(T).
+\]
+
+通俗地说：系统把一条本来可能有用的记忆归档后，它不再出现；因为它不再出现，系统永远不知道自己当初归档错了；错误因此会自己维持自己。
+
+#### T1(b)：有恢复时的上界
+
+若每步以概率 (q>0) restore/probe，且恢复证据以概率 \(\rho\) 越过识别阈值，则：
+
+\[
+\mathbb E[R_T]
+\le
+O\left(\frac{1}{q\rho}\right)+\text{恢复成本},
+\]
+
+与 (T) 无关。
+
+通俗地说：恢复不是免费，但只要永远保留一条重新检查的通道，错误不会无限期积累。
+
+#### T1(c)：去掉审查后下界消失
+
+若 archive 不改变未来证据到达率：
+
+\[
+p_{\mathrm{arch}}=p,
+\]
+
+则未来证据仍会到达，watchful policy 最终可以修正，regret 退化为常数级。
+
+这一步证明线性下界不是“任何因果问题都有”，而是依赖 archive-induced evidence censoring。
+
+### 16.7 第七步：T2 严格证明它不是普通 bandit/OPE 的换名
+
+假设已经完成 T2 的严格版本。定义一类受限 reduction：
+
+- 保持即时 reward 语义；
+- 保持动作集合和 persistent action window；
+- 保持可用观测信息；
+- 不允许偷偷加入 evidence availability、lineage 或 restore state；
+- 不允许把被 archive 的未来证据预先注入日志。
+
+T2 证明：在这些限制下，普通 static/contextual bandit 或 standard OPE reduction 无法保持原问题的反馈语义和次线性可解性；任何忠实 reduction 都必须显式加入：
+
+\[
+\text{evidence availability}
+\quad\text{或}\quad
+\text{lineage/restore state}.
+\]
+
+通俗地说：普通 bandit 只需要记录“选了哪个选项、得到多少奖励”；Agent Memory 还必须记录“这个记忆现在还有没有机会重新出现、证据从哪里来、能不能恢复”。不记录这些，就不是同一个问题了。
+
+这一步完成后，论文就不再只是把普通 bandit/OPE 变量名改成 memory，而是证明了 memory lifecycle 具有不同的反馈语义。
+
+### 16.8 第八步：P4 严格证明探测成本是不可避免的
+
+假设 P4 完成严格 minimax 下界。为了以置信度 (1-delta) 区分 K/A 两个相反最优动作世界，任何策略至少需要：
+
+\[
+N_{\mathrm{probe}}
+\ge
+\Omega\left(\frac{\log(1/\delta)}{\mathrm{KL}(P_K,P_A)}\right)
+\]
+
+或等价的模型特化形式。
+
+再结合 T1(b) 的 restore 上界：
+
+\[
+\text{information lower bound}
+\le
+\text{SQCAD restore cost}
+\le
+\text{同阶上界}.
+\]
+
+通俗地说：系统想知道“这条归档记忆到底有没有价值”，就必须付出重新检查的成本；SQCAD 的 probe/restore 不是人为浪费，而是在信息论上有最低价格。
+
+### 16.9 第九步：由定理反推 SQCAD 框架
+
+完整理论不直接推出“某个神经网络结构”，而是推出一组必须存在的功能语义。
+
+#### Evidence 层：沉默不是价值低
+
+必须记录：
+
+- 最近暴露时间；
+- candidate support；
+- exposure probability；
+- 沉默持续时长；
+- source/derived lineage；
+- restore/revalidation history。
+
+核心规则：
+
+> 证据突然消失不能直接被解释成负面价值；它可能是 archive 造成的 evidence starvation。
+
+#### Qualification 层：从估计转为授权
+
+必须输出识别状态，而不是单一分数：
+
+\[
+Q(i,s)\in
+\{\texttt{point},\texttt{bound},\texttt{unresolved},\texttt{mismatch}\}.
+\]
+
+决策必须使用识别集合和三成本比较：
+
+\[
+\min\{
+R^*(L,U),
+C_{\mathrm{defer}},
+C_{\mathrm{probe}}+R^*_{\mathrm{after\ probe}}
+\}.
+\]
+
+#### Access 层：恢复必须是正式动作
+
+必须支持：
+
+- archive/downweight；
+- restore/probe；
+- restore 后的证据更新；
+- 恢复成本和延迟记录；
+- source 保留与 derived access 分离。
+
+恢复不是异常处理，而是打破 self-obscuring loop 的必要控制通道。
+
+#### Decision 层：commit 需要可证明的资格
+
+只有在识别集合不跨动作边界，或者 probe/defer 成本比较显示 commit 最优时，才能执行持久动作。
+
+### 16.10 第十步：最终框架必须满足的条件
+
+在 T1、T2、P4 完成后，SQCAD 或任何声称解决该问题的框架至少必须满足：
+
+1. **Treatment fidelity**：persistent action 的窗口、作用域和回滚语义可观测；
+2. **Candidate/evidence accounting**：能区分真实低价值与治理造成的沉默；
+3. **Lineage preservation**：source、derived memory 和访问策略分离保存；
+4. **Decision identification**：使用识别集合判断动作是否跨边界，而不是只看点估计；
+5. **Censoring awareness**：archive 导致的支持集裁剪被显式建模；
+6. **Recovery channel**：存在可配置的 restore/probe，且有明确成本；
+7. **Cost-aware authorization**：commit、defer、probe/restore 在同一成本合同下比较；
+8. **Interference awareness**：共同暴露和有限预算下必要时退守 bundle-level；
+9. **Scope/version conditioning**：作用域、模型、工具和 evaluator 变化触发重新资格化；
+10. **Reversibility and auditability**：动作可回滚，证据、假设、边界和决策理由可复核。
+
+### 16.11 这条链最终证明了什么
+
+假设 T2 和 P4 严格完成后，论文可以提出以下核心理论结论：
+
+> 在持久 Agent Memory 中，治理动作可能同时改变生命周期价值和未来证据可得性。由此产生 self-obscuring identification dynamics：无恢复通道时存在线性 regret，下界不能在保持反馈语义的情况下直接化约为普通 bandit/OPE；恢复探测具有不可避免的信息成本，并可由 SQCAD 式策略达到同阶上界。
+
+这已经足以支持：
+
+> Agent Memory 的持久访问治理包含一个独立的基础理论子问题。
+
+但仍不能扩张为：
+
+> 已建立 Agent Memory 全领域的完整基础理论。
+
+后一个表述还需要把 interference granularity、source/derived lineage、scope transport、authorization certificate 和更多真实任务族纳入统一理论。

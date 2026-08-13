@@ -179,10 +179,14 @@ for p in AUTO_ARCHIVED_POLICIES + ("standard_ope", "bandit_ucb",
                                   "static_bandit_ucb"):
     INITIAL_STATE[p] = "archived"
 INITIAL_STATE["contextual_bandit"] = "kept"
+INITIAL_STATE["contextual_bandit_oracle"] = "archived"
+INITIAL_STATE["random_flip"] = "kept"
 
 PART_OF: Dict[str, str] = {p: "part1" for p in DECISION_POLICIES}
 PART_OF.update({p: "part3" for p in AUTO_ARCHIVED_POLICIES})
 PART_OF.update({p: "part2" for p in CONTROL_POLICIES})
+PART_OF["contextual_bandit_oracle"] = "part2"
+PART_OF["random_flip"] = "part2"
 
 
 # ---------------------------------------------------------------------------
@@ -257,6 +261,13 @@ def run_policy(world: World, policy: str,
     # world stream is policy-independent
     rng = random.Random(cfg.seed * 7919 + sum(ord(c) for c in policy)
                         + (0 if cfg.world == "K" else 7))
+    # random_flip: T2 pairing-identity control (16- 1.4).  The flip coin is
+    # seeded WORLD-INDEPENDENTLY so the K/A state trajectories couple
+    # (Lemma 3): at every post-decision step exactly one world accrues the
+    # tau*p step loss, and the paired regret sum is the constant
+    # tau*p*(T - n_early) even under maximal (random) adaptivity.
+    flip_rng = random.Random(cfg.seed * 104729 + 13) \
+        if policy == "random_flip" else None
     q = cfg.probe_q if probe_q is None else probe_q
 
     early_exposed_ys = [y for y, e in zip(world.early_y, world.early_exposed)
@@ -480,6 +491,9 @@ def run_policy(world: World, policy: str,
         if policy == "static_bandit_ucb" and ucb_n > 0 \
                 and ucb_mean - 1.96 * (cfg.noise_sd / math.sqrt(ucb_n)) > 0.0:
             state = "kept"
+        if policy == "random_flip" and t >= cfg.n_early \
+                and flip_rng.random() < 0.5:
+            state = "kept" if state == "archived" else "archived"
         if policy == "standard_ope" and state == "archived":
             # re-estimate the lifecycle value from the log every 25 steps;
             # with overlap (archived exposures exist) the estimate recovers
@@ -508,6 +522,13 @@ def run_policy(world: World, policy: str,
                 alpha = my - beta * mx
                 pred = alpha + beta * ctx[t]
                 state = "kept" if pred > 0.0 else "archived"
+        if policy == "contextual_bandit_oracle":
+            # T2 control (16- §1.6): the FORBIDDEN reduction -- the image
+            # context would depend on the latent world identity (phi not
+            # world-independent).  With the smuggled signal the standard
+            # learner trivially succeeds, pinning the impossibility on the
+            # phi constraint rather than on learner weakness.
+            state = "kept" if cfg.world == "K" else "archived"
 
         # -- per-step value, regret, mechanism metrics ---------------------
         value = cfg.kept_value if state == "kept" else 0.0
