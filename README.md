@@ -9,7 +9,9 @@
 > **Propose broadly. Qualify cautiously. Focus competitively.**
 > Access decays. Source evidence survives. Belief is scoped.
 
-![SQCAD framework](docs/assets/sqcad-framework-20260813.png)
+![SQCAD core mechanism](docs/assets/sqcad-framework-20260813.png)
+
+_Core design view: association proposes, scoped qualification grants persistent permission, and a fixed-budget projection turns qualification into competitive access._
 
 ## What problem this attacks
 
@@ -40,7 +42,7 @@ This repository is a **research artifact with rigorous controlled evidence**, no
 
 - ✅ **Verified (strict proofs + controlled numerics):** memory-specific identification gaps — observational equivalence with opposite optimal actions, query-local causal effects insufficient for lifecycle decisions, source averages not automatically transportable (Theorems 1–2, Corollary 1); a self-obscuring lifecycle theorem: any committed policy without a recovery channel has regret `Θ(T)` while recovery gives `O(1/qρ)` (T1, `docs/研究逻辑与理论证明/15-…`); reduction separation: no faithful feedback-preserving reduction to standard bandit/OPE without an evidence-availability state (T2, `16-…`); minimax probing lower bounds with matching order (P4); qualification-gated recovery of known lifecycle values under identification conditions C1–C8, with all five tested violations caught as `unresolved`/`mismatch`.
 - ✅ **Verified (controlled unified-contract benchmarks):** 18-policy main table and cost contract (`results/`, gitignored, hash-frozen) — see `docs/docs_en/02_experiments.md`.
-- ⏳ **Not yet done:** public end-to-end comparison on LongMemEval-S / LoCoMo with a real LLM reader (`docs/研究逻辑与理论证明/17-…`); official R3 reproductions of model-dependent baselines (no GPU / no API key on the current machine — status per baseline in `docs/BASELINE_AUDIT.md`).
+- ⏳ **Not yet done:** public end-to-end comparison on LongMemEval-S / LoCoMo with a real LLM reader (`docs/草稿-draft/实验方案与基线/17-…`); official R3 reproductions of model-dependent baselines (no GPU / no API key on the current machine — status per baseline in `docs/实验证据链/15-基线开源状态与无GPU复现审计-20260813.md`).
 - ❌ **Not claimed:** SOTA on any public benchmark; causal discovery from observational success; universal scope transport; physical deletion guarantees.
 
 ## Quick start
@@ -97,20 +99,20 @@ SQCAD/
 
 All main-table comparisons share one **unified contract**: the same chronological candidate stream (no future leakage), reader, prompt, context/token budget, evaluator, seeds and cost contract. Every policy is a black box that only sees the current-timepoint stream; the runner executes actions, advances time and scores future held-out QA.
 
-Three tiers (`docs/BASELINE_AUDIT.md` has the per-baseline detail):
+Three tiers (`docs/实验证据链/15-基线开源状态与无GPU复现审计-20260813.md` has the per-baseline detail):
 
 | Tier | Contents | Status |
 |---|---|---|
 | **R1 reproducible controls** | no-memory, keep-all, FIFO/LRU, recency, fixed/frequency decay, BM25, dense, BM25+dense RRF | ✅ in-repo, CPU-only |
 | **R2 structural controls** | association-only, query-local/CMI proxy, item-level causal, bundle-level, no-restore/probe, SQCAD ablations | ✅ in-repo, CPU-only |
-| **R3 official systems** | SimpleMem, Oblivion, Memory Worth, FadeMem, DeMem, SAGE, MemAudit, GateMem | ⏳ official reproductions blocked without GPU/API keys; frozen commits and per-baseline paths in `docs/BASELINE_AUDIT.md` |
+| **R3 official systems** | SimpleMem, Oblivion, Memory Worth, FadeMem, DeMem, SAGE, MemAudit, GateMem | ⏳ official reproductions blocked without GPU/API keys; frozen commits and per-baseline paths in `docs/实验证据链/15-基线开源状态与无GPU复现审计-20260813.md` |
 
 Benchmarks: LongMemEval-S (local, hash-frozen, retrieval baselines run) · LoCoMo (local, frozen) · GoodAI-LTM / MemoryAgentBench (accessibility audited).
 
 ## Documentation
 
 - [Overview](docs/docs_en/00_overview.md) · [Method](docs/docs_en/01_method.md) · [Experiments](docs/docs_en/02_experiments.md) · [Data & baselines](docs/docs_en/03_data_and_baselines.md) · [Reproducibility & status](docs/docs_en/04_reproducibility_and_status.md)
-- [Baseline audit](docs/BASELINE_AUDIT.md) — per-baseline open-source status, CPU/no-GPU reproduction analysis
+- [Baseline audit](docs/实验证据链/15-基线开源状态与无GPU复现审计-20260813.md) — per-baseline open-source status, CPU/no-GPU reproduction analysis
 - Chinese lab record: [研究总图](docs/docs_zn/00-研究总图.md) · [实验证据链](docs/实验证据链/00-实验报告与当前结论.md) · [研究逻辑与理论证明](docs/研究逻辑与理论证明/README.md)
 
 ## Citation

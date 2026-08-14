@@ -6,7 +6,7 @@
 2. **Controlled mechanism study** — hitchhikers, rare positives, stale memory, scope shifts, risk asymmetry and fixed budgets with enumerated potential outcomes.
 3. **Baseline comparison** — 18-policy unified-contract main table: keep-all, recency, fixed decay, BM25, dense, RRF, association-only access, governance-proxy rows and the qualification-gated framework row.
 4. **Ablation and mechanism analysis** — qualification, scope transport, competitive normalization, positive protection, negative attenuation, fallback and restoration (W0–W3 self-obscuring ablations).
-5. **External validation** — LongMemEval-S and LoCoMo under fixed chronological protocols (`docs/研究逻辑与理论证明/17-…`); retrieval protocol run locally, end-to-end QA pending LLM endpoints.
+5. **External validation** — LongMemEval-S and LoCoMo under fixed chronological protocols (`docs/草稿-draft/实验方案与基线/17-…`); retrieval protocol run locally, end-to-end QA pending LLM endpoints.
 6. **Stress and failure analysis** — unseen scopes, version shifts, scope-label permutation, boundary adversaries, budget extremes, evaluator drift and high qualification noise.
 
 ## Executed evidence (controlled, hash-frozen)

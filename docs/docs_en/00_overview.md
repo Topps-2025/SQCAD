@@ -29,8 +29,8 @@ Qualification is conditional, not global. A memory can be positive in one task/u
 
 The framework is reverse-derived from formal results (`docs/研究逻辑与理论证明/`): identification gaps (Theorems 1–2, Corollary 1), a self-obscuring lifecycle theorem — committed policies without a recovery channel have regret Θ(T) while qualified recovery achieves O(1/qρ) (T1, `15-…`) — reduction separation from standard bandit/OPE (T2, `16-…`), and minimax probing lower bounds with matching-order upper bounds (P4).
 
-Controlled simulations and engineering tests support mechanism-level claims only. LongMemEval retrieval has been run locally; LoCoMo data is locally frozen; full public end-to-end comparison against strong memory-governance systems remains a separate verification stage (plan: `docs/研究逻辑与理论证明/17-…`). This project does not currently claim state-of-the-art performance.
+Controlled simulations and engineering tests support mechanism-level claims only. LongMemEval retrieval has been run locally; LoCoMo data is locally frozen; full public end-to-end comparison against strong memory-governance systems remains a separate verification stage (plan: `docs/草稿-draft/实验方案与基线/17-…`). This project does not currently claim state-of-the-art performance.
 
 ## Repository and database
 
-Core code and lightweight documents live in the C-drive repository. Large corpora, models, generated results and archives live in the external database described in `DATA_STORAGE.md`. Baseline open-source status and CPU/no-GPU reproduction analysis: `docs/BASELINE_AUDIT.md`.
+Core code and lightweight documents live in the C-drive repository. Large corpora, models, generated results and archives live in the external database described in `DATA_STORAGE.md`. Baseline open-source status and CPU/no-GPU reproduction analysis: `docs/实验证据链/15-基线开源状态与无GPU复现审计-20260813.md`.

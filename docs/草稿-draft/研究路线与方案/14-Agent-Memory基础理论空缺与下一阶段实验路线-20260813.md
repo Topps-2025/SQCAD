@@ -18,7 +18,7 @@
 
 下一阶段不应继续扩大通用因果工具清单，而应集中检验：
 
-\[
+$$
 \text{治理动作}
 \rightarrow
 \text{未来候选/证据流}
@@ -26,7 +26,8 @@
 \text{未来可识别性}
 \rightarrow
 \text{后续治理动作}.
-\]
+
+$$
 
 如果这条闭环被严格证明并通过结构消融，就能把论文从“通用理论在 Agent Memory 上的应用”推进到“从 Agent Memory 结构中产生新理论”。
 
@@ -67,11 +68,12 @@
 
 ### 2.3 Theorem 4/5：未识别时强行提交有下界
 
-若生命周期效应的识别集合为 \([L,U]\)，且 \(L\le 0\le U\)，则相容世界支持不同动作。任何不探测、不拒绝的 committing rule 都有 minimax regret：
+若生命周期效应的识别集合为 $[L,U]$，且 $L\le 0\le U$，则相容世界支持不同动作。任何不探测、不拒绝的 committing rule 都有 minimax regret：
 
-\[
+$$
 R^*(L,U)=\frac{U(-L)}{U-L}.
-\]
+
+$$
 
 所以当前已经证明：
 
@@ -92,7 +94,7 @@ Theorem 4/5 的数学骨架可以迁移到医疗、推荐、广告或一般 OPE�
 
 最有希望的独有机制不是“有混杂”，而是“治理动作改变未来还能否获得证据”：
 
-\[
+$$
 \text{archive/downweight}
 \rightarrow
 \text{候选支持下降}
@@ -102,7 +104,8 @@ Theorem 4/5 的数学骨架可以迁移到医疗、推荐、广告或一般 OPE�
 \text{错误治理无法被发现}
 \rightarrow
 \text{错误治理持续存在}.
-\]
+
+$$
 
 这可称为 **self-obscuring / self-confirming memory governance**。
 
@@ -121,12 +124,13 @@ Theorem 4/5 的数学骨架可以迁移到医疗、推荐、广告或一般 OPE�
 
 适合形式化为：
 
-\[
+$$
 M_t \rightarrow E_t \rightarrow X_{t+1},Y_t
 \rightarrow M_{t+1},
-\]
 
-并显式加入有限上下文/注意力预算 \(B_t\)。
+$$
+
+并显式加入有限上下文/注意力预算 $B_t$。
 
 不能直接写成的部分：
 
@@ -156,13 +160,14 @@ Agent 可能面对：
 
 因此，记忆价值不一定是同一固定 reward process 上的简单累积。更合适的形式是：
 
-\[
+$$
 S_{t+1}\sim P(\cdot\mid S_t,A_t,M_t,\xi_t),
 \qquad
 \xi_{t+1}\sim P_\mathrm{task}(\cdot\mid \xi_t,M_t,A_t),
-\]
 
-其中 \(\xi_t\) 表示任务/用户/工具作用域，可能随 agent 行为和 memory 状态改变。
+$$
+
+其中 $\xi_t$ 表示任务/用户/工具作用域，可能随 agent 行为和 memory 状态改变。
 
 可检验假设 H2：
 
@@ -207,9 +212,10 @@ S_{t+1}\sim P(\cdot\mid S_t,A_t,M_t,\xi_t),
 
 当前无探测线性 regret、探测后平台化和 KL 同阶结果仍主要是计算验证。需要严格证明：
 
-\[
+$$
 R_T^{\mathrm{no\ restore/probe}}\ge cT,
-\]
+
+$$
 
 以及某种 restore/probe 策略的显式上界，并把探测、延迟、token 和恢复成本纳入同一决策目标。
 
@@ -240,10 +246,10 @@ R_T^{\mathrm{no\ restore/probe}}\ge cT,
 
 ### T1：Self-obscuring lifecycle theorem（最高优先级）
 
-在 archive 会降低未来候选支持、错误归档后只能以概率 \(q\) restore 的模型类中，证明：
+在 archive 会降低未来候选支持、错误归档后只能以概率 $q$ restore 的模型类中，证明：
 
-1. 任意无 restore/probe 的 committing policy 在相反最优动作世界上具有 \(\Omega(T)\) regret；
-2. 具有 \(q>0\) 的恢复探测策略具有显式有限或次线性 regret 上界；
+1. 任意无 restore/probe 的 committing policy 在相反最优动作世界上具有 $\Omega(T)$ regret；
+2. 具有 $q>0$ 的恢复探测策略具有显式有限或次线性 regret 上界；
 3. 当候选支持与证据流独立于 action 时，上述线性下界消失或退化为普通 bandit/OPE 下界。
 
 ### T2：Reduction separation theorem
@@ -270,9 +276,10 @@ R_T^{\mathrm{no\ restore/probe}}\ge cT,
 
 定义证书：
 
-\[
+$$
 Z=(\text{estimand},\text{scope},\text{support},\text{measurement},\text{bound},\text{action}).
-\]
+
+$$
 
 证明：
 
@@ -359,13 +366,14 @@ Z=(\text{estimand},\text{scope},\text{support},\text{measurement},\text{bound},\
 
 目标是验证：
 
-\[
+$$
 \text{interference structure}
 \rightarrow
 \text{identifiable coalition}
 \rightarrow
 \text{最细安全治理粒度}.
-\]
+
+$$
 
 ### 7.7 Source/derived/restore 实验
 
@@ -421,7 +429,7 @@ Z=(\text{estimand},\text{scope},\text{support},\text{measurement},\text{bound},\
 
 ## 10. 近期执行顺序
 
-1. 冻结最小 self-obscuring 模型，完成 T1 的严格 \(\Omega(T)\) 下界；
+1. 冻结最小 self-obscuring 模型，完成 T1 的严格 $\Omega(T)$ 下界；
 2. 完成 restore/probe 的显式上界，并加入 token、延迟和风险成本；
 3. 做 W0–W3 结构消融，证明现象在去掉关键结构后消失；
 4. 做静态 bandit、contextual bandit、标准 OPE 的 reduction control；
@@ -466,14 +474,15 @@ Z=(\text{estimand},\text{scope},\text{support},\text{measurement},\text{bound},\
 
 这一层是从“领域没有做”走向“为什么这个问题具有基础性”的关键。需要证明以下闭环真实存在且可被干预：
 
-\[
- A_t^{\mathrm{access}}
+$$
+A_t^{\mathrm{access}}
  \rightarrow C_{t+1}
  \rightarrow E_{t+1}
  \rightarrow Y_{t+1}
  \rightarrow O_{t+1}^{\mathrm{evidence}}
  \rightarrow A_{t+1}^{\mathrm{access}}.
-\]
+
+$$
 
 其中治理动作不仅影响回报，还影响未来证据能否出现。至少需要逐项显示：
 
@@ -490,7 +499,7 @@ Z=(\text{estimand},\text{scope},\text{support},\text{measurement},\text{bound},\
 基础理论不能只给一个反例数字，需要至少形成一个可量词化的结果族：
 
 - **不可识别性定理**：在某个明确定义的 persistent-memory model class 上，存在观测等价且最优动作相反的世界；
-- **动态下界**：无 restore/probe 或无最小探索率时，累计 regret 至少为 \(\Omega(T)\) 或给出与恢复概率、证据间隔和支持覆盖有关的下界；
+- **动态下界**：无 restore/probe 或无最小探索率时，累计 regret 至少为 $\Omega(T)$ 或给出与恢复概率、证据间隔和支持覆盖有关的下界；
 - **结构分离定理**：去掉 archive-induced candidate/evidence censoring 后，问题可以化约为标准 bandit/OPE；保留它后，任何保持原有反馈语义的 reduction 必须显式加入 evidence availability、lineage 或 restore 状态；
 - **恢复上界**：在给定 restore 概率、可观测反馈和 overlap 条件下，给出 probe/restore 策略的显式 regret 或 sample-complexity 上界；
 - **治理粒度边界**：在非可加 interference 下，刻画 item-level 与 bundle-level 的最细可识别治理粒度；
@@ -618,15 +627,17 @@ Z=(\text{estimand},\text{scope},\text{support},\text{measurement},\text{bound},\
 
 理论定理通常是条件命题：
 
-\[
+$$
 \text{在模型类 }\mathcal M\text{ 和观测合同 }\mathcal O\text{ 下，某性质成立}.
-\]
+
+$$
 
 框架性能则是：
 
-\[
+$$
 \text{在某个任务分布、LLM、reader、budget 和成本合同下，平均表现如何}.
-\]
+
+$$
 
 因此，SQCAD 在一个真实 benchmark 上不如 RRF，并不能直接否定 Theorem 1/2/4/5。
 
@@ -705,13 +716,14 @@ Agent Memory 现有工作分别处理了：
 
 #### 得到的初始假设
 
-\[
+$$
 \text{常用 memory score}
 \not\Rightarrow
 \text{持久访问生命周期价值}
 \not\Rightarrow
 \text{安全治理授权}.
-\]
+
+$$
 
 通俗地说：现有方法通常回答“这条记忆现在看起来有用吗”，而论文要回答“改变它未来能不能被看到，会不会改善未来一长段任务，以及我们有没有足够证据做这个改变”。
 
@@ -721,13 +733,14 @@ Agent Memory 现有工作分别处理了：
 
 把模糊的“记忆价值”固定为：
 
-\[
+$$
 A_i^{\mathrm{pers}}\in\{\texttt{keep},\texttt{archive},\texttt{downweight},\texttt{restore}\},
-\]
+
+$$
 
 并定义：
 
-\[
+$$
 V_s^\pi(a)
 =
 \mathbb E^\pi\left[
@@ -735,13 +748,15 @@ V_s^\pi(a)
 \bigl(Y_t-\lambda C_t-\rho R_t\bigr)
 \mid do(A_i^{\mathrm{pers}}=a),s
 \right].
-\]
+
+$$
 
 比较效应为：
 
-\[
+$$
 \tau_s^\pi(a_1,a_0)=V_s^\pi(a_1)-V_s^\pi(a_0).
-\]
+
+$$
 
 观测合同必须包含：
 
@@ -764,11 +779,12 @@ V_s^\pi(a)
 
 证明：
 
-\[
+$$
 P_{M_1}(O)=P_{M_2}(O),
 \qquad
 \tau_{M_1}>0,\;\tau_{M_2}<0.
-\]
+
+$$
 
 通俗地说：记忆和成功总是一起出现，不代表到底是谁起了作用；可能是旁边另一条记忆在起作用。
 
@@ -809,9 +825,10 @@ source 环境的平均效应不能自动授权 target 环境的访问动作，�
 
 令生命周期效应识别集合为：
 
-\[
+$$
 \mathcal I(o)=[L,U].
-\]
+
+$$
 
 若：
 
@@ -821,9 +838,10 @@ source 环境的平均效应不能自动授权 target 环境的访问动作，�
 
 跨零时，任何直接 commit 的规则都有：
 
-\[
+$$
 R^*(L,U)=\frac{U(-L)}{U-L}
-\]
+
+$$
 
 的 minimax regret。
 
@@ -835,14 +853,15 @@ R^*(L,U)=\frac{U(-L)}{U-L}
 
 现在才进入基础理论的特化部分。定义最小生命周期模型：
 
-\[
+$$
 A_t^{\mathrm{access}}
 \rightarrow C_{t+1}
 \rightarrow E_{t+1}
 \rightarrow Y_{t+1}
 \rightarrow O_{t+1}^{\mathrm{evidence}}
 \rightarrow A_{t+1}^{\mathrm{access}}.
-\]
+
+$$
 
 关键设置：
 
@@ -855,21 +874,23 @@ A_t^{\mathrm{access}}
 
 由早期观测等价，策略在 K/A 两世界必须做相同动作；由 archive-induced silence，错误动作后不再产生新证据；所以错误会持续整个 horizon：
 
-\[
+$$
 R_T=\tau p(T-n_{\mathrm{early}})=\Theta(T).
-\]
+
+$$
 
 通俗地说：系统把一条本来可能有用的记忆归档后，它不再出现；因为它不再出现，系统永远不知道自己当初归档错了；错误因此会自己维持自己。
 
 #### T1(b)：有恢复时的上界
 
-若每步以概率 (q>0) restore/probe，且恢复证据以概率 \(\rho\) 越过识别阈值，则：
+若每步以概率 (q>0) restore/probe，且恢复证据以概率 $\rho$ 越过识别阈值，则：
 
-\[
+$$
 \mathbb E[R_T]
 \le
 O\left(\frac{1}{q\rho}\right)+\text{恢复成本},
-\]
+
+$$
 
 与 (T) 无关。
 
@@ -879,9 +900,10 @@ O\left(\frac{1}{q\rho}\right)+\text{恢复成本},
 
 若 archive 不改变未来证据到达率：
 
-\[
+$$
 p_{\mathrm{arch}}=p,
-\]
+
+$$
 
 则未来证据仍会到达，watchful policy 最终可以修正，regret 退化为常数级。
 
@@ -899,11 +921,12 @@ p_{\mathrm{arch}}=p,
 
 T2 证明：在这些限制下，普通 static/contextual bandit 或 standard OPE reduction 无法保持原问题的反馈语义和次线性可解性；任何忠实 reduction 都必须显式加入：
 
-\[
+$$
 \text{evidence availability}
 \quad\text{或}\quad
 \text{lineage/restore state}.
-\]
+
+$$
 
 通俗地说：普通 bandit 只需要记录“选了哪个选项、得到多少奖励”；Agent Memory 还必须记录“这个记忆现在还有没有机会重新出现、证据从哪里来、能不能恢复”。不记录这些，就不是同一个问题了。
 
@@ -913,23 +936,25 @@ T2 证明：在这些限制下，普通 static/contextual bandit 或 standard OP
 
 假设 P4 完成严格 minimax 下界。为了以置信度 (1-delta) 区分 K/A 两个相反最优动作世界，任何策略至少需要：
 
-\[
+$$
 N_{\mathrm{probe}}
 \ge
 \Omega\left(\frac{\log(1/\delta)}{\mathrm{KL}(P_K,P_A)}\right)
-\]
+
+$$
 
 或等价的模型特化形式。
 
 再结合 T1(b) 的 restore 上界：
 
-\[
+$$
 \text{information lower bound}
 \le
 \text{SQCAD restore cost}
 \le
 \text{同阶上界}.
-\]
+
+$$
 
 通俗地说：系统想知道“这条归档记忆到底有没有价值”，就必须付出重新检查的成本；SQCAD 的 probe/restore 不是人为浪费，而是在信息论上有最低价格。
 
@@ -956,20 +981,22 @@ N_{\mathrm{probe}}
 
 必须输出识别状态，而不是单一分数：
 
-\[
+$$
 Q(i,s)\in
 \{\texttt{point},\texttt{bound},\texttt{unresolved},\texttt{mismatch}\}.
-\]
+
+$$
 
 决策必须使用识别集合和三成本比较：
 
-\[
+$$
 \min\{
 R^*(L,U),
 C_{\mathrm{defer}},
 C_{\mathrm{probe}}+R^*_{\mathrm{after\ probe}}
 \}.
-\]
+
+$$
 
 #### Access 层：恢复必须是正式动作
 

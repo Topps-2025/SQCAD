@@ -1,8 +1,8 @@
-﻿# SQCAD 项目进度审计（2026-08-13）
+# SQCAD 项目进度审计（2026-08-13）
 
 > 本审计回答三个问题：(1) 从哪些文献读出 research gap 假设，并转化为了哪些研究理念、工作与痛点；(2) gap 是如何被设计成可证伪命题并以实验证明立住的，为什么现有工作无法覆盖、基线工作是什么；(3) 定理形式化、证明、框架反推、条件充分性/必要性与框架成本收益分别由哪些实验支撑。
 >
-> 与 `docs/研究逻辑与理论证明/00-ResearchGap到充分性与必要性的完整实验逻辑线-20260813.md` 的关系：`00` 是**论证逻辑线**（每个主张的证据链），本审计是**进度台账**（完成度、阻塞、下一步）。理论推进路线见 `docs/研究逻辑与理论证明/13-形式化为真正理论空白的必要性证明方向-20260813.md`（P0–P4）。
+> 与 `docs/草稿-draft/研究路线与方案/00-ResearchGap到充分性与必要性的完整实验逻辑线-20260813.md` 的关系：`00` 是**论证逻辑线**（每个主张的证据链），本审计是**进度台账**（完成度、阻塞、下一步）。理论推进路线见 `docs/草稿-draft/研究路线与方案/13-形式化为真正理论空白的必要性证明方向-20260813.md`（P0–P4）。
 
 ---
 
@@ -19,7 +19,7 @@
 ### 1.2 从文献到 gap 假设（两步，严格区分假设与证明）
 
 1. **文献驱动的假设**（`08-Gap1覆盖审计`）：现有常用代理（关联共现、query-local 效应、source 平均）可能不足以支撑持久访问生命周期决策——仅凭"已读工作未覆盖"不能推出"无法覆盖"，所以只是假设；
-2. **升级为可证伪命题**（`11-形式化定理陈述与证明`）：固定 treatment（持久访问动作）、estimand（lifecycle value \(V_s^\pi(a)\)）、观测合同（候选/暴露/位置/预算/采纳/结局/版本/作用域）、失败判据（两个观测等价世界给出相反最优动作）→ Theorem 1/2 + Corollary 1。
+2. **升级为可证伪命题**（`11-形式化定理陈述与证明`）：固定 treatment（持久访问动作）、estimand（lifecycle value $V_s^\pi(a)$）、观测合同（候选/暴露/位置/预算/采纳/结局/版本/作用域）、失败判据（两个观测等价世界给出相反最优动作）→ Theorem 1/2 + Corollary 1。
 
 ### 1.3 转化为的研究理念与痛点
 
@@ -120,7 +120,7 @@
 | **T2 严格化 + P4 minimax 下界（评审回应批）** | ✅ 完成（严格证明 + 数值佐证） | `16`、`实验证据链/14`、`reduction_closure.py`（16 项新测试）、`self_obscuring_ablation.py`（random_flip/oracle 控制） | 配对恒等式任意策略逐位精确；忠实像上 Θ(T)；禁止 φ 控制成功；N* 下界与后悔分解全格点成立；阶匹配（绑定 regime 常数因子） |
 | 外部 rollout（chronological future） | ⏸ 阻塞（模型端点） | `00 实验证据链` 未验证清单 | — |
 | 公开数据集客观治理比较 | ⏳ 方案已定、实施未完成 | `17-SQCAD公开数据集落地与框架实验方案-20260813.md` | LongMemEval-S 主集 + LoCoMo 复验；统一合同、同一 reader/evaluator、无手工金标依赖 |
-| **公开数据集落地准备批（本批）** | ✅ 完成 | `18-基线开源状态与无GPU复现审计-20260813.md`、`docs/BASELINE_AUDIT.md`、`tools/render_framework_diagram.py` | ①核心源码冻结（255 测试通过 + 四件套清单重生成，聚合 `badbb886…`，code 46/results 25/reports 11）；②框架工程图 13-（Evidence→Qualification→Access→Decision→Lifecycle，含 T1/T2/P4 之后的 censoring-aware 语义与 restore/probe 通道，渲染脚本入仓库）；③GitHub 展示层组建（README 重写、docs_en 更新、CITATION.cff）；④12 个 R3 基线 + 4 个基准数据集逐一网络核查（结论：仅 ActMem 真 GPU 阻塞；其余 API-key 阻塞或纯 CPU；Oblivion 代码公开但 NEC 专有许可；FadeMem/Memory Worth/DeMem/Trivium/GovMem 无官方代码；LoCoMo 官方 F1 无 judge LLM 可纯 CPU 评分） | 按 17 §5 先做 D1/D2 检索协议（可全 CPU）与 LoCoMo 离线 F1；Oblivion/SimpleMem 非 LLM 机器离线验收 |
+| **公开数据集落地准备批（本批）** | ✅ 完成 | `18-基线开源状态与无GPU复现审计-20260813.md`、`docs/实验证据链/15-基线开源状态与无GPU复现审计-20260813.md`、`tools/render_framework_diagram.py` | ①核心源码冻结（255 测试通过 + 四件套清单重生成，聚合 `badbb886…`，code 46/results 25/reports 11）；②框架工程图 13-（Evidence→Qualification→Access→Decision→Lifecycle，含 T1/T2/P4 之后的 censoring-aware 语义与 restore/probe 通道，渲染脚本入仓库）；③GitHub 展示层组建（README 重写、docs_en 更新、CITATION.cff）；④12 个 R3 基线 + 4 个基准数据集逐一网络核查（结论：仅 ActMem 真 GPU 阻塞；其余 API-key 阻塞或纯 CPU；Oblivion 代码公开但 NEC 专有许可；FadeMem/Memory Worth/DeMem/Trivium/GovMem 无官方代码；LoCoMo 官方 F1 无 judge LLM 可纯 CPU 评分） | 按 17 §5 先做 D1/D2 检索协议（可全 CPU）与 LoCoMo 离线 F1；Oblivion/SimpleMem 非 LLM 机器离线验收 |
 | 论文写作（Introduction 规范稿等） | ✅ 已有草稿 | `07-Introduction规范稿` | 声称压缩最后做 |
 
 **测试与工程状态**：全套 **255 项测试通过**（239 + 16 新）；`results/`（gitignored）与 D 盘外部数据库同步（34 个 JSON）；冻结清单 `freeze_manifest.json` **已重新生成**（聚合 SHA-256 `badbb886d0e878126cd6aa8582fe7d43f0f307dce67c1a4f4e1ce758a94f9b61`；code 46 / config registry + 两冻结数据集字节哈希 / results 25 / reports 11）；公开数据集主表尚未冻结，不能把当前受控 runner 结果写成外部 SOTA。

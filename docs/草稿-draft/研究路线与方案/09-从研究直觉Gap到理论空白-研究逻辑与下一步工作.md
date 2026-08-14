@@ -21,7 +21,7 @@
 | 工作 | 实际估计的量 | 为什么与 SQCAD 不同 |
 | --- | --- | --- |
 | Memory Worth | 历史 success/failure 共现 → 关联价值 | 不区分 policy-generated exposure 与 causal contribution |
-| CMI | query-local intervention effect \(\Delta_t(i)\) | 固定 query + candidate，不涉及未来轨迹 |
+| CMI | query-local intervention effect $\Delta_t(i)$ | 固定 query + candidate，不涉及未来轨迹 |
 | Trivium | 一般序贯因果修订（causal probe → SCM revision） | treatment 是预设 SCM 的 probe，不是 persistent memory access |
 | GovMem | 写入时证据资格（provenance, scope, counterevidence） | 判断写入资格，不估计写入后持久访问的跨期因果价值 |
 | OPE / MSM / causal bandits | 通用序贯处理效应 | 未针对 memory-specific treatment construction 给出可操作协议 |
@@ -132,11 +132,11 @@ Non-identifiability (counterexamples A, B, C)
 
 ### 1.1 假设的核心陈述
 
-**H1（estimand 区分假设）**：存在一个定义良好的 estimand \(V_s^\pi(a)\)——persistent-access lifecycle value——它不同于：(i) 历史关联价值（Memory Worth 类），(ii) query-local intervention effect（CMI 类），(iii) 通用序贯因果修订的 treatment effect（Trivium 类），(iv) 写入时证据资格判断（GovMem 类）。
+**H1（estimand 区分假设）**：存在一个定义良好的 estimand $V_s^\pi(a)$——persistent-access lifecycle value——它不同于：(i) 历史关联价值（Memory Worth 类），(ii) query-local intervention effect（CMI 类），(iii) 通用序贯因果修订的 treatment effect（Trivium 类），(iv) 写入时证据资格判断（GovMem 类）。
 
-**H2（不可识别性假设）**：在仅观测历史 candidate、exposure 和 outcome 的日志信息集合下，\(V_s^\pi(a)\) 不可被点识别。即存在 \(M_1 \neq M_2\) 使得 \(P_{M_1}(O) = P_{M_2}(O)\) 但 \(V_{s,M_1}^\pi(a) \neq V_{s,M_2}^\pi(a)\)。
+**H2（不可识别性假设）**：在仅观测历史 candidate、exposure 和 outcome 的日志信息集合下，$V_s^\pi(a)$ 不可被点识别。即存在 $M_1 \neq M_2$ 使得 $P_{M_1}(O) = P_{M_2}(O)$ 但 $V_{s,M_1}^\pi(a) \neq V_{s,M_2}^\pi(a)$。
 
-**H3（决策必要性假设）**：存在至少一类环境，其中使用关联价值、局部效应或 scope 平均值替代 \(V_s^\pi(a)\) 做访问决策会产生严格正的 regret。
+**H3（决策必要性假设）**：存在至少一类环境，其中使用关联价值、局部效应或 scope 平均值替代 $V_s^\pi(a)$ 做访问决策会产生严格正的 regret。
 
 ### 1.2 假设的证伪条件
 
@@ -146,7 +146,7 @@ Non-identifiability (counterexamples A, B, C)
 | --- | --- | --- |
 | H1 | 发现已有工作明确定义并估计了 persistent-access lifecycle value | 收缩 Gap；若已有工作仅部分覆盖，缩小为"未被充分形式化" |
 | H2 | 无法构造出 observationally equivalent 但 lifecycle value 不同的两个世界 | 说明现有日志信息已足够；Gap 缩小为 engineering gap |
-| H3 | 在所有构造环境中，替代决策的 regret 均为零 | \(V_s^\pi\) 无独立决策价值；问题本身不成立 |
+| H3 | 在所有构造环境中，替代决策的 regret 均为零 | $V_s^\pi$ 无独立决策价值；问题本身不成立 |
 
 ### 1.3 不能再使用的宽泛表述
 
@@ -206,27 +206,29 @@ SQCAD 的理论对象应优先选择"记忆 (i) 的持久访问状态"，因为�
 
 定义：
 
-\[
+$$
 A_{i}^{\mathrm{pers}}
 \in \mathcal A
 =\{\text{keep},\text{downweight},\text{isolate},\text{archive},\text{restore}\}.
-\]
+
+$$
 
 需要明确 action 的生效时刻、持续时间、是否可撤回、是否影响 candidate generation、是否改变 workspace budget，以及多个 memory action 是否相互竞争。
 
 一次 query 中的加入/移除属于局部 exposure treatment：
 
-\[
+$$
 E_{i,t}\in\{0,1\}.
-\]
 
-它可以是生命周期模型中的中介变量或局部子实验，但不能直接冒充 \(A_i^{\mathrm{pers}}\)。
+$$
+
+它可以是生命周期模型中的中介变量或局部子实验，但不能直接冒充 $A_i^{\mathrm{pers}}$。
 
 ### 2.4 生命周期价值
 
-在作用域 (s)、目标策略 \(\pi\)、时间窗口 (H) 和折扣因子 \(\gamma\) 下，定义：
+在作用域 (s)、目标策略 $\pi$、时间窗口 (H) 和折扣因子 $\gamma$ 下，定义：
 
-\[
+$$
 V_s^\pi(a)
 =
 \mathbb E^{\pi}
@@ -236,21 +238,23 @@ V_s^\pi(a)
 \;\middle|\;
 do(A_i^{\mathrm{pers}}=a),s
 \right].
-\]
+
+$$
 
 其中：
 
-- \(Y_t\)：任务或行动效用；
-- \(C_t\)：token、延迟、probe、人工 review 或恢复成本；
-- \(R_t\)：风险或危害项；
-- \(\lambda,\rho\)：预注册的成本和风险权重；
-- \(H\)：生命周期评估窗口。
+- $Y_t$：任务或行动效用；
+- $C_t$：token、延迟、probe、人工 review 或恢复成本；
+- $R_t$：风险或危害项；
+- $\lambda,\rho$：预注册的成本和风险权重；
+- $H$：生命周期评估窗口。
 
 针对两个持久动作的比较为：
 
-\[
+$$
 \tau_s^\pi(a_1,a_0)=V_s^\pi(a_1)-V_s^\pi(a_0).
-\]
+
+$$
 
 这个 estimand 不是"更复杂的 utility score"，而是一个反事实决策量：它回答改变长期访问权是否会使未来轨迹更好。
 
@@ -274,25 +278,28 @@ do(A_i^{\mathrm{pers}}=a),s
 
 设历史可观测数据为：
 
-\[
+$$
 O_{1:H}=\{C_t,X_t,E_t,P_t,D_t,A_t,Y_t,c_t\}_{t=1}^{H},
-\]
 
-其中 \(C_t\) 为 candidate stream，\(X_t\) 为任务、用户、工具和模型状态，\(E_t\) 为 exposure，\(P_t\) 为位置/预算，\(D_t\) 为 adoption 的可观测代理，\(A_t\) 为行动，\(Y_t\) 为 outcome，\(c_t\) 为成本。
+$$
 
-如果存在两个结构模型 \(M_1,M_2\)，满足：
+其中 $C_t$ 为 candidate stream，$X_t$ 为任务、用户、工具和模型状态，$E_t$ 为 exposure，$P_t$ 为位置/预算，$D_t$ 为 adoption 的可观测代理，$A_t$ 为行动，$Y_t$ 为 outcome，$c_t$ 为成本。
 
-\[
+如果存在两个结构模型 $M_1,M_2$，满足：
+
+$$
 P_{M_1}(O_{1:H})=P_{M_2}(O_{1:H}),
-\]
+
+$$
 
 但：
 
-\[
+$$
 V_{s,M_1}^\pi(a)\neq V_{s,M_2}^\pi(a),
-\]
 
-则 \(V_s^\pi(a)\) 在该观测信息集合下不可识别。
+$$
+
+则 $V_s^\pi(a)$ 在该观测信息集合下不可识别。
 
 证明重点应是构造"日志相同、干预后未来不同"的两个世界。例如：
 
@@ -309,45 +316,50 @@ V_{s,M_1}^\pi(a)\neq V_{s,M_2}^\pi(a),
 
 CMI 类方法可以估计：
 
-\[
+$$
 \Delta_t(i)
 =
 \mathbb E[Y_t\mid do(E_{i,t}=1)]
 -
 \mathbb E[Y_t\mid do(E_{i,t}=0)].
-\]
 
-即使 \(\Delta_t(i)\) 被无偏估计，也不能推出：
+$$
 
-\[
+即使 $\Delta_t(i)$ 被无偏估计，也不能推出：
+
+$$
 V_s^\pi(\text{archive})
 -
 V_s^\pi(\text{keep}).
-\]
+
+$$
 
 需要通过一个反例或分解说明：局部干预固定了当前 candidate/query，而持久干预改变未来 candidate stream、co-memory composition、policy update 和后续任务。因此 Gap 1 不是否定 CMI，而是证明其 estimand 对 lifecycle decision 不充分。
 
-> ⚠ **分支点 B2**：如果存在一个从 \(\{\Delta_t(i)\}\) 到 \(V_s^\pi(a)\) 的通用映射（即使在特定条件下），则局部效应足以支撑 lifecycle decision。Gap 1 缩小为"需要显式写出这个映射的条件"，而非"存在理论空白"。
+> ⚠ **分支点 B2**：如果存在一个从 $\{\Delta_t(i)\}$ 到 $V_s^\pi(a)$ 的通用映射（即使在特定条件下），则局部效应足以支撑 lifecycle decision。Gap 1 缩小为"需要显式写出这个映射的条件"，而非"存在理论空白"。
 
 ### 3.3 笼统作用域平均也不够
 
 定义作用域异质效应：
 
-\[
+$$
 \tau(s)=V_s^\pi(a_1)-V_s^\pi(a_0).
-\]
+
+$$
 
 历史总体平均：
 
-\[
+$$
 \mathbb E_{s\sim P_{\mathrm{source}}}[\tau(s)]
-\]
 
-一般不能替代目标作用域 \(s^*\) 的：
+$$
 
-\[
+一般不能替代目标作用域 $s^*$ 的：
+
+$$
 \tau(s^*).
-\]
+
+$$
 
 可构造 source 平均效应为零，但 target scope 中效应显著为正或为负的例子。这说明"估计了某个因果效应"仍然不等于"获得了未来记忆治理的可用证据"。
 
@@ -355,11 +367,12 @@ V_s^\pi(\text{keep}).
 
 在固定 workspace budget 下，提高记忆 (i) 的访问质量会降低其他候选的访问质量。于是：
 
-\[
+$$
 V(a_i=1,a_j=1)-V(a_i=0,a_j=0)
 \neq
 \tau_i+\tau_j
-\]
+
+$$
 
 一般成立。理论工作需要选择一种明确处理方式：
 
@@ -374,26 +387,28 @@ V(a_i=1,a_j=1)-V(a_i=0,a_j=0)
 
 ## 4. 阶段 B（续）：证明这个量有决策意义
 
-> 仅有不可识别性还不够——需要证明忽略 \(V_s^\pi\) 会导致实际治理错误。
+> 仅有不可识别性还不够——需要证明忽略 $V_s^\pi$ 会导致实际治理错误。
 
 定义风险和成本约束下的访问决策：
 
-\[
+$$
 a^\star
 =
 \arg\max_{a\in\mathcal A}
 \left\{
 V_s^\pi(a)-\lambda C(a)-\rho R(a)
 \right\}.
-\]
 
-若系统使用历史关联、query-local effect 或笼统 scope 平均值形成 \(\hat a\)，则决策遗憾为：
+$$
 
-\[
+若系统使用历史关联、query-local effect 或笼统 scope 平均值形成 $\hat a$，则决策遗憾为：
+
+$$
 \mathrm{Regret}_s
 =
 V_s^\pi(a^\star)-V_s^\pi(\hat a).
-\]
+
+$$
 
 需要证明或构造至少一类环境，使得：
 
@@ -402,7 +417,7 @@ V_s^\pi(a^\star)-V_s^\pi(\hat a).
 - source-scope 平均值推荐 archive，但 target scope 中 rare protective memory 应被保留；
 - 贸然行动的期望损失高于 abstain 或额外 probe 的成本。
 
-这样才能证明 \(V_s^\pi\) 不是人为增加复杂度，而是对访问治理具有不可替代的决策信息。论文不必声称该量在所有环境中提高 utility；应声称忽略它在某些可构造环境中产生严格 regret，因而它是管理问题的必要决策对象。
+这样才能证明 $V_s^\pi$ 不是人为增加复杂度，而是对访问治理具有不可替代的决策信息。论文不必声称该量在所有环境中提高 utility；应声称忽略它在某些可构造环境中产生严格 regret，因而它是管理问题的必要决策对象。
 
 ---
 
@@ -454,12 +469,13 @@ V_s^\pi(a^\star)-V_s^\pi(\hat a).
 
 source-scope 的 lifecycle value 与 target-scope 的决策应分开：
 
-\[
+$$
 V_{s^*}^\pi(a\mid D_s)
 =
 \int V_{s^*}^\pi(a;\theta)
 p(\theta\mid D_s)\,d\theta .
-\]
+
+$$
 
 这个 posterior-predictive quantity 属于 transport 和 decision 层。它需要额外说明：
 
@@ -522,9 +538,10 @@ Access 层 = 接收 qualification + 风险 + 成本 + interference，执行动�
 
 从"给记忆打正负分"升级为"判断证据是否满足作用域下的识别和决策门槛"：
 
-\[
+$$
 Q_i(s)\in\{positive,negative,unresolved,mismatch\}.
-\]
+
+$$
 
 正向或负向 qualification 必须关联 treatment definition、scope、overlap、干预证据和 calibration；`unresolved` 表示缺乏改变 persistent access 的权限。
 
@@ -536,7 +553,7 @@ Q_i(s)\in\{positive,negative,unresolved,mismatch\}.
 
 > ⚠ **分支点 D1 — Qualification gate 的设计空间**：
 >
-> 当前设计：\(Q_i(s)\) 输出四类离散状态，只有 `positive` 或 `negative` 允许改变 persistent access。
+> 当前设计：$Q_i(s)$ 输出四类离散状态，只有 `positive` 或 `negative` 允许改变 persistent access。
 >
 > 备选方案：
 > - 若 Theorem 3 的识别条件在实践中过于严格，gate 可改为连续 confidence score + 阈值
@@ -583,7 +600,7 @@ candidate generation
 
 有了点估计、区间或 posterior 后，定义访问动作：
 
-\[
+$$
 a^\star
 =
 \arg\max_{a\in\mathcal A}
@@ -592,7 +609,8 @@ a^\star
 -\lambda \widehat C(a)
 -\rho \widehat R(a)
 \right],
-\]
+
+$$
 
 但只有在识别和不确定性门成立时才允许改变 persistent access。否则：
 
@@ -611,11 +629,11 @@ a^\star
 
 ### Theorem candidate 1：Observational non-identifiability
 
-在只观测历史 candidate、exposure 和 outcome，且 persistent access 改变未来 candidate transition 的设置下，存在 observationally equivalent 的结构模型，其 lifecycle value 不同。因此 \(V_s^\pi(a)\) 不可由该日志集合点识别。
+在只观测历史 candidate、exposure 和 outcome，且 persistent access 改变未来 candidate transition 的设置下，存在 observationally equivalent 的结构模型，其 lifecycle value 不同。因此 $V_s^\pi(a)$ 不可由该日志集合点识别。
 
 ### Theorem candidate 2：Local intervention insufficiency
 
-即使所有 query-local intervention effect \(\Delta_t(i)\) 均已知，只要 persistent action 会改变未来 candidate transition、co-memory composition 或 policy update，仍不存在从 \(\{\Delta_t(i)\}\) 到 \(V_s^\pi(a)\) 的一般无假设映射。
+即使所有 query-local intervention effect $\Delta_t(i)$ 均已知，只要 persistent action 会改变未来 candidate transition、co-memory composition 或 policy update，仍不存在从 $\{\Delta_t(i)\}$ 到 $V_s^\pi(a)$ 的一般无假设映射。
 
 ### Theorem candidate 3：Identification with micro-intervention
 
@@ -733,7 +751,7 @@ source period 只形成 qualification；冻结规则后进入 chronological futu
 - 命题 C → scope transport limitation theorem（Corollary，见 `11-形式化定理陈述与证明.md`）
 
 **第 8 步：证明 identification theorem** 🔶 定理已写、协议路径已实验验证
-- 核心问题：在什么最小条件下，\(V_s^\pi(a)\) 可由日志和 micro-intervention 识别？
+- 核心问题：在什么最小条件下，$V_s^\pi(a)$ 可由日志和 micro-intervention 识别？
 - 输出：observable identification formula 或 partial-identification bound
 - 状态：Theorem 3 v2 已写出（决策期模型 + 双路估计器 + Qualification 门控）；**Stage 1 通过**（协议路径恢复已知值，5 seeds 稳定），**Stage 2 五种违反全部被 gate 捕获**（见 `实验证据链/03-识别恢复实验报告-20260812.md`）
 - 剩余：观测路径（sequential g-formula/DR）实现与验证；C6/C7 失败时的部分识别界

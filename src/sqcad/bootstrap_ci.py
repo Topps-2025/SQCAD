@@ -232,7 +232,7 @@ def _bootstrap_mean_ci(samples: Sequence[float], method: str,
                 "n_boot": 0.0, "method": method}
     reps, rep_ses = [], []
     for _ in range(n_boot):
-        rs = [xs[rng.randrange(n)] for _ in range(n)]
+        rs = [xs[int(rng.random() * n)] for _ in range(n)]
         reps.append(mean(rs))
         rep_ses.append(pstdev(rs) / math.sqrt(n))
     se_obs = (pstdev(xs) / math.sqrt(n) if n > 1 else 0.0)
@@ -263,9 +263,12 @@ def paired_trajectory_ci(keep_u: Sequence[float], arc_u: Sequence[float],
     diffs = [k - a for k, a in zip(ks, ac)]
     reps, rep_ses = [], []
     for _ in range(n_boot):
-        rs = [diffs[rng.randrange(n)] for _ in range(n)]
-        reps.append(mean(rs))
-        rep_ses.append(pstdev(rs) / math.sqrt(n))
+        rs = [diffs[int(rng.random() * n)] for _ in range(n)]
+        m = math.fsum(rs) / n
+        reps.append(m)
+        v = math.fsum((x - m) * (x - m) for x in rs) / (n - 1) \
+            if n > 1 else 0.0
+        rep_ses.append(math.sqrt(v / n))
     se_obs = pstdev(diffs) / math.sqrt(n) if n > 1 else 0.0
     out = _interval_from_replicates(diffs, reps, n_boot, alpha, method,
                                     rep_ses=rep_ses, se_obs=se_obs)
@@ -287,9 +290,12 @@ def paired_seed_ci(per_seed: Sequence[float], n_boot: int = 2000,
     rng = _rng(seed)
     reps, rep_ses = [], []
     for _ in range(n_boot):
-        rs = [xs[rng.randrange(n)] for _ in range(n)]
-        reps.append(mean(rs))
-        rep_ses.append(pstdev(rs) / math.sqrt(n))
+        rs = [xs[int(rng.random() * n)] for _ in range(n)]
+        m = math.fsum(rs) / n
+        reps.append(m)
+        v = math.fsum((x - m) * (x - m) for x in rs) / (n - 1) \
+            if n > 1 else 0.0
+        rep_ses.append(math.sqrt(v / n))
     se_obs = pstdev(xs) / math.sqrt(n) if n > 1 else 0.0
     out = _interval_from_replicates(xs, reps, n_boot, alpha, method,
                                     rep_ses=rep_ses, se_obs=se_obs)
@@ -329,11 +335,17 @@ def independent_seed_diff_ci(a: Sequence[float], b: Sequence[float],
     rng = _rng(seed)
     reps, rep_ses = [], []
     for _ in range(n_boot):
-        ra = [as_[rng.randrange(n)] for _ in range(n)]
-        rb = [bs_[rng.randrange(n)] for _ in range(n)]
-        reps.append(mean(ra) - mean(rb))
-        rep_ses.append(math.sqrt(
-            pstdev(ra) ** 2 / n + pstdev(rb) ** 2 / n))
+        ra = [as_[int(rng.random() * n)] for _ in range(n)]
+        rb = [bs_[int(rng.random() * n)] for _ in range(n)]
+        ma = math.fsum(ra) / n
+        mb = math.fsum(rb) / n
+        reps.append(ma - mb)
+        va = math.fsum((x - ma) * (x - ma) for x in ra) / (n - 1) \
+            if n > 1 else 0.0
+        vb = math.fsum((x - mb) * (x - mb) for x in rb) / (n - 1) \
+            if n > 1 else 0.0
+        rep_ses.append(math.hypot(math.sqrt(va), math.sqrt(vb))
+                       / math.sqrt(n))
     se_obs = math.sqrt(pstdev(as_) ** 2 / n + pstdev(bs_) ** 2 / n) \
         if n > 1 else 0.0
     stat_mean = mean(as_) - mean(bs_)

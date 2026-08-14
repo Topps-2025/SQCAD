@@ -36,9 +36,10 @@
 (ii) **策略映射** R_π：Π′ → Π（目标类策略拉回为源类策略）；
 (iii) **观测映射** φ = (φ_t)_{t≥0}，φ_t : 𝒪^t → 𝒪′^t，**世界无关**（φ 是"观测历史"的函数，不接收 latent/世界身份）；φ 可随机化，但分布只依赖于观测历史；
 (iv) **反馈保持（feedback preservation）**：对任意 W ∈ 𝒲 与任意 π′ ∈ Π′，图像世界 R_W(W) 在策略 π′ 下的观测过程逐点等于 φ 作用于源世界 W 在 π = R_π(π′) 下的观测过程：
-\[
+$$
 \operatorname{obs}'_{R_W(W)}(\pi') \;=\; \phi\bigl(\operatorname{obs}_W(\pi)\bigr) \qquad \text{(a.s.)}
-\]
+
+$$
 (v) **保真（fidelity）**：对任意 W, π′：Regret_{R_W(W)}(π′) = Regret_W(R_π(π′))（允许 o(T) 偏差；定理只用到 ≥ 方向）。
 
 **定义 2（标准类）**。contextual bandit（每步先显示 context c_t，再选动作、只观察所选动作的奖励）、log-based OPE（学习者从日志行 (x, a, y) 训练策略）、以及任何"学习者的观测由协议给出、不额外访问 latent 或动作外的信息"的类。注意：**显式携带 evidence-availability / restore / lineage 状态的类不在标准族内**——这正是分离的靶点。
@@ -48,9 +49,10 @@
 **设置**：K/A 配对世界，共享耦合（早期流逐位相同、暴露随机数相同，latent ±τ——15- 引理 1 的构造）。
 
 **引理 3**。设 R = (R_W, R_π, φ) 是从 self-obscuring 类 𝒞* 到任意类的忠实保反馈化约。对任意目标策略 π′，令 π = R_π(π′)。则图像观测过程逐点相同：
-\[
+$$
 \operatorname{obs}'_{R_W(K)}(\pi') \;=\; \operatorname{obs}'_{R_W(A)}(\pi') \qquad \text{(a.s.)}
-\]
+
+$$
 特别地，若目标类是 contextual bandit，两图像的 context 序列逐点相同；任何（确定性的）目标策略在两图像中做出相同的动作序列。
 
 **证明**。15- 引理 1：耦合下 obs_K(π) = obs_A(π)（决策是观测历史的函数，观测历史相同则动作相同，归纳逐点成立）。定义 1(iv)：obs'_{R_W(K)}(π') = φ(obs_K(π))，obs'_{R_W(A)}(π') = φ(obs_A(π))。由 obs_K(π) = obs_A(π) 逐点相同与 φ 的世界无关性（定义 1(iii)），右端逐点相等。目标策略的动作是其图像观测历史的函数，故动作序列相同。∎
@@ -58,10 +60,11 @@
 ### 1.4 引理 4（逐点后悔恒等式）
 
 对任意策略 π（任意自适应、任意翻转），两世界的后悔逐点求和恒为常数：
-\[
+$$
 \mathrm{Regret}_K(\pi) + \mathrm{Regret}_A(\pi) = \tau p\,(T - n_{\mathrm{early}})
 \qquad \text{(a.s.)}
-\]
+
+$$
 
 **证明**。每步 t ≥ n_early，动作 a_t ∈ {keep, archive}。K 世界正确动作 = keep，A 世界正确动作 = archive，故**每步恰好有一个世界动作错误**（keep 时 A 错、archive 时 K 错）。对称损失设定下（`实验证据链/13` §1：K 错误归档步与 A 有害滞留步每步均损失 τp），逐点后悔之和 = τp·(T − n_early)。∎
 
@@ -70,9 +73,10 @@
 ### 1.5 定理 2（严格版）：保反馈化约不可能性
 
 **定理 2**。设 𝒞* 为 self-obscuring 类（K/A 配对、p_arch = 0、共享耦合、τ > 0、p > 0）。**不存在忠实保反馈化约** R 从 𝒞* 到任何标准类 𝒞′（定义 2），使得 𝒞′ 上存在对 R(𝒞*) 全体实例 regret 为次线性的策略。更强：对任意忠实保反馈化约 R 与任意目标策略 π′，
-\[
+$$
 \max_{W \in \{K,A\}} \mathrm{Regret}_{R_W(W)}(\pi') \;\ge\; \frac{1}{2}\,\tau p\,(T - n_{\mathrm{early}}) = \Theta(T).
-\]
+
+$$
 
 **证明**。取配对 (K, A) ∈ 𝒞* 与任意 π′ ∈ Π′，π = R_π(π′)。引理 3：π′ 在两图像中动作序列相同。引理 4（经定义 1(v) 保真传递到图像）：Regret_{R(K)}(π′) + Regret_{R(A)}(π′) = τp(T − n_early)。故 max ≥ ½τp(T − n_early)。次线性不可能。∎
 
@@ -83,9 +87,10 @@
 **推论 2（新状态必要性）**。若忠实保反馈化约 R 在 𝒞* 上达到次线性最坏后悔，则存在 (K, A) 配对其图像观测过程不同。由定义 1(iii)(iv)，这只能来自某图像观测分量不是 φ(obs) 的函数——即化约**显式增加了新状态**；由于源侧唯一不可观测的信息是 latent 与"动作 → 未来证据可得性"机制，该新状态只能是 evidence-availability / lineage / restore 状态（或等价地，世界身份——即把答案走私进观测的作弊，已排除）。形式化：次线性 ⟺ 增加证据可得性状态。
 
 **推论 3（充分性，15- 定理 1(b)）**。增加 restore 通道（速率 q、成功 ρ、成本 c_restore）后，存在策略满足
-\[
+$$
 \mathbb E[R_T] \;\le\; \frac{\tau p}{q\rho} + \frac{c_{\text{probe}}}{q\rho} + c_{\text{restore}},
-\]
+
+$$
 与 T 无关（次线性、事实上 O(1)（q 固定））。
 
 **组合**（"self-obscuring 不是普通 bandit 的一般探索困难"）：定理 2 把 Θ(T) 下界提升为所有忠实化约的不变量；推论 2/3 指出唯一逃逸通道就是显式证据可得性状态，且该通道被 T1(b) 以最优阶（见 §2.4）利用。数值侧：W2 中标准学习者在图像上精确线性 5.85（`实验证据链/13` §4）；latent-augmented 控制（违反 φ 世界无关性）成功；W3 增加状态后 0.425（`实验证据链/14` §2）。
@@ -114,17 +119,19 @@
 **设置**。𝒞_arch 内，恢复/探测成功的观测 y ~ N(τ, σ²)（K）或 N(−τ, σ²)（A），σ 已知。策略以错误率 ≤ δ 在两侧同时正确提交（K 提交 keep、A 提交 archive）所需观测数：
 
 **定理 3**。令 KL = 2τ²/σ² 为 N(τ,σ²) 与 N(−τ,σ²) 的单观测 KL 散度，Δ = 2τ。任何以最大错误率 ≤ δ 区分两假设的过程需要
-\[
+$$
 N_{\mathrm{probe}} \;\ge\; N^*(\delta) \;=\; \frac{\log(1/\delta)}{\mathrm{KL}}
 \;=\; \frac{\sigma^2 \log(1/\delta)}{2\tau^2}
 \;=\; \Omega\!\left(\frac{\log(1/\delta)}{\Delta^2}\right).
-\]
+
+$$
 
 **证明**（Le Cam 两点 + Chernoff 界）。n 个独立观测下两分布 P_+^n, P_−^n。任意检验 φ 的极小最大误差 e* = inf_φ max(P_+^n[φ=0], P_−^n[φ=1])。由似然比下界（Bretagnolle–Huber 形式）：
-\[
+$$
 e^* \;\ge\; \frac{1}{2}\Bigl(1 - \bigl\|\sqrt{dP_+^n} - \sqrt{dP_-^n}\bigr\|_2^2\Bigr)^{1/2}
 \;\ge\; \frac{1}{2}\exp\!\Bigl(-\frac{n}{2}\,\mathrm{KL}(P_+ \| P_-)\Bigr),
-\]
+
+$$
 其中第二个不等式对任意 P_+, P_− 由 √Hellinger ≤ √(KL/2) 与 Hellinger 张量化成立（Gaussian 情形可显式计算：∫√(dP_+^n dP_−^n) = exp(−n·KL/2)）。要求 e* ≤ δ 得 n ≥ log(1/(2δ))/KL；标准形式 log(1/δ)/KL 在常数因子内相同。高斯显式：KL = (2τ)²/(2σ²) = 2τ²/σ²。∎
 
 ### 2.3 定理 4（P4b）：后悔分解下界（censoring 与 q 纳入）
@@ -132,9 +139,10 @@ e^* \;\ge\; \frac{1}{2}\Bigl(1 - \bigl\|\sqrt{dP_+^n} - \sqrt{dP_-^n}\bigr\|_2^2
 **通道模型**（与 T1(b) 同协议，15- §2.3）：archived 状态下，策略每步以概率 q 尝试 probe；尝试成功概率 ρ；一次成功暴露一个观测 y ~ N(±τ, σ²)，花费 c_probe。观测数达到 N* 之前，策略无法以 ≤ δ 错误率提交（定理 3），其间 K 世界每步损失 τp。令 t_res = 首次达到 N* 观测的时间，N = 尝试总数。
 
 **定理 4**。𝒞_arch 内任意策略在 K 世界的期望后悔满足
-\[
+$$
 \mathbb E[\mathrm{Regret}_K] \;\ge\; \tau p \cdot \frac{N^*(\delta)}{q\rho} \;+\; c_{\text{probe}} \cdot \frac{N^*(\delta)}{\rho} \;=\; \frac{N^*(\delta)}{\rho}\left(\frac{\tau p}{q} + c_{\text{probe}}\right).
-\]
+
+$$
 
 **证明**。后悔分解为三项（评审要求的形式）：错误治理期间的生命周期损失 ≥ τp·E[t_res]（K 世界 archive 全程错误）；证据获取成本 = c_probe·E[尝试数]；恢复等待已并入 E[t_res]。观测只能在成功 probe 时到达：成功数 ≤ Bin(尝试, ρ) 且尝试受 q 限制，达到 N* 次成功所需期望步数 ≥ N*/(qρ)，所需期望尝试数 ≥ N*/ρ（两类几何随机变量和的期望）。E[Regret_K] = τp·E[t_res] + c_probe·E[尝试数] + （无其他项）≥ 上式。∎
 
@@ -143,19 +151,21 @@ e^* \;\ge\; \frac{1}{2}\Bigl(1 - \bigl\|\sqrt{dP_+^n} - \sqrt{dP_-^n}\bigr\|_2^2
 ### 2.4 匹配（推论 4）：恢复通道达到正确复杂度阶
 
 **定理 1(b) 上界**（15-）：SQCAD 式恢复策略（恢复后证据流以速率 p 持续，观测累积到 CI 排除 0 即提交）：
-\[
+$$
 R_T^{\mathrm{SQCAD}} \;\le\; \frac{\tau p}{q\rho} + \frac{c_{\text{probe}}}{q\rho} + c_{\text{restore}}.
-\]
+
+$$
 （恢复路线优于逐探测路线的机制：一次恢复换取连续证据流，观测到达率从 qρ 提升到 p。）
 
 **推论 4（阶匹配）**。在 𝒞_arch 中，对任意 δ ∈ (0,1)：
-\[
+$$
 \frac{N^*(\delta)}{\rho}\left(\frac{\tau p}{q} + c_{\text{probe}}\right)
 \;\le\; \max_W \mathbb E[\mathrm{Regret}_W]
 \;\le\;
 \frac{\tau p + c_{\text{probe}}}{q\rho} + c_{\text{restore}}
 \;\le\; C(\delta)\,\frac{N^*(\delta)}{\rho}\left(\frac{\tau p}{q} + c_{\text{probe}}\right)
-\]
+
+$$
 其中 C(δ) = max(2, 1/(2N*(δ)))·const 为与 τ、q、T 无关的常数（检测阈值 z 与错误率 δ 的换算常数，数值 ~2–4，`实验证据链/14` §3）。**上下界同阶**（在 τ、q、T、Δ 上同阶）⇒ SQCAD 的恢复通道不是任意设计，而是在该模型类中达到正确复杂度阶的治理机制：证据获取成本（c_probe·N*/ρ）、恢复等待成本（τp·N*/(qρ)）、错误治理期间的生命周期损失（τp·N*/(qρ)）三项全部被 T1(b) 上界以常数因子闭合。
 
 ### 2.5 与 12- §6 数值层的关系

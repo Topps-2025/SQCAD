@@ -39,13 +39,13 @@ Memory Worth 类方法：从历史检索-结果日志中构造 success/failure �
 
 ### 1.2 命题陈述
 
-仅观测 \(O_{1:H} = (C_t, E_t, Y_t)\)——candidate、exposure 和 outcome——通常无法识别 \(V_s^\pi(a)\)。
+仅观测 $O_{1:H} = (C_t, E_t, Y_t)$——candidate、exposure 和 outcome——通常无法识别 $V_s^\pi(a)$。
 
 ### 1.3 实验构造
 
 **合成世界设计**：
 
-两个结构模型 \(M_1\)（记忆真正有用）和 \(M_2\)（记忆被 confounded 共同暴露）：
+两个结构模型 $M_1$（记忆真正有用）和 $M_2$（记忆被 confounded 共同暴露）：
 
 | 要素 | 世界 M₁（有用世界） | 世界 M₂（混杂世界） |
 | --- | --- | --- |
@@ -55,7 +55,7 @@ Memory Worth 类方法：从历史检索-结果日志中构造 success/failure �
 | 历史日志 (C, E, Y) | 分布 P₁ | 分布 P₂ = P₁（构造使二者相等） |
 | archive m* 后的未来效用 | 显著下降 | 不变或上升 |
 
-**关键约束**：\(P_{M_1}(C_{1:H}, E_{1:H}, Y_{1:H}) = P_{M_2}(C_{1:H}, E_{1:H}, Y_{1:H})\)。
+**关键约束**：$P_{M_1}(C_{1:H}, E_{1:H}, Y_{1:H}) = P_{M_2}(C_{1:H}, E_{1:H}, Y_{1:H})$。
 
 **数据生成过程**：
 
@@ -88,9 +88,9 @@ M₂（混杂世界）：
 
 ### 1.5 验证指标
 
-- **日志分布距离**：验证 \(D_{KL}(P_1 || P_2) \approx 0\) 或统计检验不显著
+- **日志分布距离**：验证 $D_{KL}(P_1 || P_2) \approx 0$ 或统计检验不显著
 - **基线评分一致性**：验证 Memory Worth 对 m* 的评分在 M₁ 和 M₂ 中无显著差异
-- **lifecycle value 差异**：验证 \(V_{s,M_1}^\pi(\text{archive}) - V_{s,M_1}^\pi(\text{keep}) \ll 0\) 但 \(V_{s,M_2}^\pi(\text{archive}) - V_{s,M_2}^\pi(\text{keep}) \ge 0\)
+- **lifecycle value 差异**：验证 $V_{s,M_1}^\pi(\text{archive}) - V_{s,M_1}^\pi(\text{keep}) \ll 0$ 但 $V_{s,M_2}^\pi(\text{archive}) - V_{s,M_2}^\pi(\text{keep}) \ge 0$
 - **结论**：历史日志相同 + 基线评分相同 + lifecycle value 不同 → 不可识别性成立
 
 ---
@@ -99,11 +99,11 @@ M₂（混杂世界）：
 
 ### 2.1 对应基线路径
 
-CMI 类方法：在固定 query 上运行 no-memory / with-memory / perturbed-memory，估计当前答案的局部 intervention effect \(\Delta_t(i)\)。
+CMI 类方法：在固定 query 上运行 no-memory / with-memory / perturbed-memory，估计当前答案的局部 intervention effect $\Delta_t(i)$。
 
 ### 2.2 命题陈述
 
-即使 \(\Delta_t(i)\) 被无偏估计，也不能推出 \(V_s^\pi(a_1) - V_s^\pi(a_0)\)。
+即使 $\Delta_t(i)$ 被无偏估计，也不能推出 $V_s^\pi(a_1) - V_s^\pi(a_0)$。
 
 ### 2.3 实验构造
 
@@ -153,8 +153,8 @@ m₂（短期无用，长期有用）：
 
 ### 2.5 验证指标
 
-- **局部效应等价性**：验证 source period 中 \(\Delta(m_1) = \Delta(m_2)\)（统计不显著差异）
-- **lifecycle value 符号相反**：验证 \(V^\pi(\text{keep}) - V^\pi(\text{archive})\) 对 m₁ < 0，对 m₂ > 0
+- **局部效应等价性**：验证 source period 中 $\Delta(m_1) = \Delta(m_2)$（统计不显著差异）
+- **lifecycle value 符号相反**：验证 $V^\pi(\text{keep}) - V^\pi(\text{archive})$ 对 m₁ < 0，对 m₂ > 0
 - **CMI 决策遗憾**：若 CMI 对两者都建议 keep → 对 m₁ 产生 regret > 0
 - **结论**：query-local effect 相同 + lifecycle value 相反 → 局部效应不足以支撑生命周期决策
 
@@ -168,13 +168,13 @@ m₂（短期无用，长期有用）：
 
 ### 3.2 命题陈述
 
-\(\mathbb{E}_{s \sim P_{\text{source}}}[\tau(s)]\) 一般不能替代 \(\tau(s^*)\)。
+$\mathbb{E}_{s \sim P_{\text{source}}}[\tau(s)]$ 一般不能替代 $\tau(s^*)$。
 
 ### 3.3 实验构造
 
 **合成世界设计**：
 
-构造三个作用域：\(s_1\)（常规任务）、\(s_2\)（高风险任务）、\(s^*\)（目标部署环境）。
+构造三个作用域：$s_1$（常规任务）、$s_2$（高风险任务）、$s^*$（目标部署环境）。
 
 | 要素 | s₁（常规任务） | s₂（高风险任务） | s*（目标环境） |
 | --- | --- | --- | --- |
@@ -215,9 +215,9 @@ target scope s*（新部署环境）：
 
 ### 3.5 验证指标
 
-- **source 平均效应**：验证 \(\mathbb{E}_s[\tau(s)] < 0\)（建议 archive）
-- **target scope 效应**：验证 \(\tau(s^*) > 0\)（实际应 keep）
-- **scope 异质性**：验证 \(\tau(s_1) \neq \tau(s_2) \neq \tau(s^*)\)
+- **source 平均效应**：验证 $\mathbb{E}_s[\tau(s)] < 0$（建议 archive）
+- **target scope 效应**：验证 $\tau(s^*) > 0$（实际应 keep）
+- **scope 异质性**：验证 $\tau(s_1) \neq \tau(s_2) \neq \tau(s^*)$
 - **决策 regret**：使用 source 平均值做决策在 target scope 中产生 regret > 0
 - **结论**：source 平均效应为负 + target 效应为正 → 笼统平均不能替代作用域条件决策
 

@@ -15,25 +15,28 @@
 **记忆状态**：$s_t \in \{\text{kept}, \text{archived}\}$，由策略的动作序列决定（持久 access action；实验 `WorldConfig.persistent`）。
 
 **暴露（candidate–exposure 反馈）**：$e_t \in \{0,1\}$ 为候选进入证据流的指示。早期阶段 $t \le n_{\text{early}}$：$e_t$ 来自两世界共享的随机流（$P(e_t{=}1)=\tfrac12$，实验 `early_exposed`）。决策点后：
-\[
+$$
 P(e_t = 1 \mid s_t = \text{kept}) = p, \qquad
 P(e_t = 1 \mid s_t = \text{archived}) = p_{\text{arch}}.
-\]
+
+$$
 （实验：$p = 0.6$；W0 非持久时 $p_{\text{arch}} = p$，W2/W3 持久且审查时 $p_{\text{arch}} = 0$，W1 持久未审查 $p_{\text{arch}} = 0.4$。）
 
 **观测**：$e_t = 1$ 时策略观测 $y_t$。两个潜在世界共享早期观测流（逐位相同，见引理 1），差异只在延续期：
-\[
+$$
 K\text{ 世界：} y_t = \tau + \varepsilon_t,\quad
 A\text{ 世界：} y_t = -\tau + \varepsilon_t,\qquad \varepsilon_t \sim N(0, \sigma^2).
-\]
+
+$$
 （实验：$\tau = 10$，早期共享流均值 $\delta_{\text{early}} = -0.5$ 为混杂信号；延续期 $\tau_{\text{true}} = \pm 10$。）
 
 **每步价值与 regret**：
-\[
+$$
 v_t = \tau_{\text{true}}\, p \cdot \mathbf 1\{s_t = \text{kept}\},
 \qquad
 R_T = \sum_{t = n_{\text{early}}+1}^{T} \left( v_t^{\text{oracle}} - v_t \right),
-\]
+
+$$
 其中 oracle 在 K 世界为 keep（$v^{\text{oracle}} = \tau p$），在 A 世界为 archive（$v^{\text{oracle}} = 0$）。决策点前不计 regret（实验一致）。
 
 **策略类**：
@@ -62,18 +65,20 @@ R_T = \sum_{t = n_{\text{early}}+1}^{T} \left( v_t^{\text{oracle}} - v_t \right)
 
 1. 由引理 1，$\pi$ 在两个世界中做**相同**的决策点动作；
 2. 若该动作是 archive 且世界为 K（或动作是 keep 且世界为 A），则对一切 $t > n_{\text{early}}$，$s_t$ 保持在该错误状态，且
-\[
+$$
 R_T(\pi) = \tau p \left( T - n_{\text{early}} \right) = \Theta(T).
-\]
+
+$$
 
 *证明*：(i) 决策点信息集 = 早期观测历史，两世界逐位相同（引理 1）→ 决策相同。(ii) 若决策错误（在 K 提交 archive，或在 A 提交 keep），则错误状态的价值损失每步恰为 $\tau p$（K：oracle $\tau p$ vs 实际 0；A：oracle 0 vs 实际 $-\tau p$，损失同为 $\tau p$）。(iii) 由引理 2 沉默冻结信息集，且 committing 策略无观测生成动作 → 状态永不改变 → 损失累计全部 $T - n_{\text{early}}$ 步。∎
 
 **推论 T1(a′)（两世界极小极大约束）**。由于决策在观测等价世界上必然相同，任意 committing policy 在 K/A 的**配对**中至少一个世界上达到线性 regret——错误无法事先检测（Theorem 1 的识别差距），而本定理把该差距的**代价**固定为斜率 $\tau p$ 的线性项。
 
 **实验对应（精确数字）**。策略斜率定义 $R_T/T$：
-\[
+$$
 \frac{\tau p (T - n_{\text{early}})}{T} = \frac{6.0 \times 1950}{2000} = 5.85.
-\]
+
+$$
 数值：`W2_K_watchful_no_restore`、`W2_K_association_commit`、`W3_K_no_probe_commit`、`W3_K_gate_no_probe`、`W3_K_gate_keep_default`、`W3_K_local_causal_commit` 的 per-step slope **全部 = 5.8500**（12-seed 均值，CI 退化到 0），与公式逐位一致；纠正时间 = 2000（从未纠正）。K 世界 slope 5.85 不是近似，而是 $\tau p (T-n_{\text{early}})/T$ 的精确值。
 
 **gate_keep_default 的特殊读法**：该门在 K 世界也提交 archive，因为混杂早期信号统计显著为负（CI 排除 0）。这**不是估计失败**——门校准正确（只在对识别集解析为负时提交）；陷阱在于识别集本身被早期流限制在错误的符号上。定理 T1(a) 对"校准正确的门"同样成立：门的行为是信息集的确定性函数，沉默冻结后不可能修正。
@@ -81,16 +86,18 @@ R_T(\pi) = \tau p \left( T - n_{\text{early}} \right) = \Theta(T).
 ### 2.3 T1(b)：$q>0$ 恢复探测的显式上界（平台）
 
 **定理 T1(b)**（restore 上界）。设 restore-capable 策略在 archived 状态下每步以概率 $q \in (0,1]$ 触发 restore（观测 $y_t$，成本 $c_{\text{probe}}$），一旦运行均值越阈 $\theta < \tau$ 则永久 restore（成本 $c_{\text{restore}}$）。在 K 世界：
-\[
+$$
 \mathbb E[R_T] \le \tau p \cdot \frac{1}{q\,\Phi\!\left(\frac{\tau - \theta}{\sigma}\right)} + \frac{c_{\text{probe}}}{q\,\Phi\!\left(\frac{\tau-\theta}{\sigma}\right)} + c_{\text{restore}},
-\]
+
+$$
 即 $\mathbb E[R_T] = O(1/q)$，**与 $T$ 无关**（次线性、平台化）。特别地当 $\tau \gg \theta$ 时 $\Phi((\tau-\theta)/\sigma) \approx 1$，$\mathbb E[R_T] \le \tau p / q + c_{\text{probe}}/q + c_{\text{restore}}$。
 
 *证明*：令 $\mathcal E_k$ 为第 $k$ 次 restore 观测越阈的事件。单次观测 $y \sim N(\tau, \sigma^2)$ 越阈概率 $\rho := P(y > \theta) = \Phi((\tau-\theta)/\sigma)$。restore 时刻 $t^* = \min\{t : \text{触发成功}\}$。触发成功在单次触发中概率 $\rho$，触发本身按几何分布（速率 $q$）到达，故
-\[
+$$
 \mathbb E[t^* - n_{\text{early}}] \le \frac{1}{q\rho}, \qquad
 \mathbb E[\#\text{restores}] \le \frac{1}{q\rho}.
-\]
+
+$$
 restore 前每步损失 $\tau p$，故 $\mathbb E[R_T] \le \tau p \cdot \mathbb E[t^* - n_{\text{early}}] \le \tau p/(q\rho)$；探测成本 $\le c_{\text{probe}}/(q\rho)$；恢复成本 $c_{\text{restore}}$ 至多一次（恢复后状态 kept，证据流以速率 $p$ 持续，运行均值保持在 $\theta$ 之上 a.s.——对 $k$ 个延续观测 $\bar x_k \to \tau$，不会再跌回）。∎
 
 **实验对应**：
@@ -106,9 +113,10 @@ restore 前每步损失 $\tau p$，故 $\mathbb E[R_T] \le \tau p \cdot \mathbb 
 ### 2.4 T1(c)：候选支持独立于 action 时下界消失
 
 **定理 T1(c)**（结构必要性，消融 A/B）。若 $p_{\text{arch}} = p > 0$（候选支持与证据流独立于治理动作；W0 query-local / W1 未审查），则对 watchful committing policy（决策后保留阈值修正规则 $\bar x_k > \theta$）：
-\[
+$$
 \mathbb E[R_T] \le \tau p \cdot \mathbb E[t^*] = O(1) \quad (\text{与 } T \text{ 无关}),
-\]
+
+$$
 其中 $t^* = \min\{k : \bar x_k > \theta\}$ 为修正时刻，$\mathbb E[t^*] < \infty$ 是固定常数。
 
 *证明*：archived 状态下观测仍以速率 $p$ 到达（$p_{\text{arch}} = p$），且观测 $y_t \sim N(\tau, \sigma^2)$（K 世界）。$\bar x_k \to \tau$ a.s.，且 $\tau > \theta$，故 $\bar x_k > \theta$ 最终成立：取 $k_0$ 使 $P(\bar x_{k_0} > \theta) \ge 1 - \delta$（由 Chebyshev，$k_0 = \lceil \sigma^2/(\tau-\theta)^2 \cdot \Phi^{-1}(1-\delta/2)^2 \rceil$ 量级），观测以速率 $p$ 到达故 $\mathbb E[t^*] \le k_0 / p + 1$ 与 $T$ 无关。修正后状态 kept，损失停止。∎

@@ -13,22 +13,22 @@ target_venue: generic
 
 ### 1.1 Sequential Agent Memory process
 
-We consider an agent that interacts with an environment for \(T\) decision steps. At step \(t\), the pre-treatment history \(H_t\) contains the task and environment state, previous observations, actions and outcomes, current memory states, candidate-generation and retrieval configuration, model and tool versions, resource budgets and all variables recorded before the memory decision. A raw event \(E_t\) is appended to an immutable evidence ledger. The persistent memory store supplies a candidate set \(\mathcal C_t\), from which a workspace composer constructs the budget-constrained runtime context.
+We consider an agent that interacts with an environment for $T$ decision steps. At step $t$, the pre-treatment history $H_t$ contains the task and environment state, previous observations, actions and outcomes, current memory states, candidate-generation and retrieval configuration, model and tool versions, resource budgets and all variables recorded before the memory decision. A raw event $E_t$ is appended to an immutable evidence ledger. The persistent memory store supplies a candidate set $\mathcal C_t$, from which a workspace composer constructs the budget-constrained runtime context.
 
 We distinguish the following variables:
 
-- \(G_t\): a governance action, such as reinforce, keep, downweight, archive, isolate or restore;
-- \(Z_t\): the vector of memory-component exposures in the agent workspace;
-- \(U_t\): observable evidence that the agent adopted or used an exposed component;
-- \(A_t\): the agent's plan, tool call or answer action;
-- \(Y_t\): proximal outcomes, including continuous reward or loss, constraint violations, action changes and resource cost;
-- \(R_T=\sum_{t=1}^{T}\gamma^{t-1}r_t\): episode-level discounted utility.
+- $G_t$: a governance action, such as reinforce, keep, downweight, archive, isolate or restore;
+- $Z_t$: the vector of memory-component exposures in the agent workspace;
+- $U_t$: observable evidence that the agent adopted or used an exposed component;
+- $A_t$: the agent's plan, tool call or answer action;
+- $Y_t$: proximal outcomes, including continuous reward or loss, constraint violations, action changes and resource cost;
+- $R_T=\sum_{t=1}^{T}\gamma^{t-1}r_t$: episode-level discounted utility.
 
-We treat \(B_t=(G_t,Z_t)\) as the time-varying treatment. The behaviour policy \(\pi_b(B_t\mid H_t)\) generates the logged trajectory, whereas an evaluation policy \(\pi_e(B_t\mid H_t)\) specifies an alternative memory-governance strategy. This formulation covers factual, episodic, procedural and constraint memories without requiring separate physical stores. Memory type, subject, time, permission, version and lifecycle state are orthogonal metadata; the physical backend may use a unified table or specialised services.
+We treat $B_t=(G_t,Z_t)$ as the time-varying treatment. The behaviour policy $\pi_b(B_t\mid H_t)$ generates the logged trajectory, whereas an evaluation policy $\pi_e(B_t\mid H_t)$ specifies an alternative memory-governance strategy. This formulation covers factual, episodic, procedural and constraint memories without requiring separate physical stores. Memory type, subject, time, permission, version and lifecycle state are orthogonal metadata; the physical backend may use a unified table or specialised services.
 
 ### 1.2 Causal estimands
 
-For an evidence-supported component bundle \(c_k\), the proximal exposure effect compares visibility and masking while holding the pre-treatment history and workspace policy fixed:
+For an evidence-supported component bundle $c_k$, the proximal exposure effect compares visibility and masking while holding the pre-treatment history and workspace policy fixed:
 
 $$
 \tau_{t,k}(h)=
@@ -49,7 +49,7 @@ V(\pi_e)=\mathbb E_{\pi_e}\!\left[
 \right],
 $$
 
-where \(c_t\) includes storage, prompt-token, latency and model-call costs, and \(q_t\) includes false forgetting, scope violations and irrecoverability risk. Proximal conditional effects are diagnostic inputs to governance; the main claim concerns policy value under a fixed resource and safety protocol.
+where $c_t$ includes storage, prompt-token, latency and model-call costs, and $q_t$ includes false forgetting, scope violations and irrecoverability risk. Proximal conditional effects are diagnostic inputs to governance; the main claim concerns policy value under a fixed resource and safety protocol.
 
 ## 2. System overview
 
@@ -97,7 +97,7 @@ $$
 \left(\mathcal C_t,\mathcal P_t,\mathcal Q_t\right).
 $$
 
-Here, \(\mathcal C_t\) denotes candidate component bundles, \(\mathcal P_t\) their evidence lineage and \(\mathcal Q_t\) their scope, version and uncertainty metadata. The two operators are complementary rather than interchangeable. Decomposition without abstraction creates addressable but context-local candidates; abstraction without decomposition creates general statements that cannot be traced or manipulated as treatments. Their composition creates transferable but still falsifiable treatment candidates. Causal estimation remains a downstream qualification stage and does not follow from either operator. We therefore isolate the interaction through raw-trajectory, decomposition-only, unsupported-rule and evidence-supported decomposition–abstraction controls.
+Here, $\mathcal C_t$ denotes candidate component bundles, $\mathcal P_t$ their evidence lineage and $\mathcal Q_t$ their scope, version and uncertainty metadata. The two operators are complementary rather than interchangeable. Decomposition without abstraction creates addressable but context-local candidates; abstraction without decomposition creates general statements that cannot be traced or manipulated as treatments. Their composition creates transferable but still falsifiable treatment candidates. Causal estimation remains a downstream qualification stage and does not follow from either operator. We therefore isolate the interaction through raw-trajectory, decomposition-only, unsupported-rule and evidence-supported decomposition–abstraction controls.
 
 ### 3.1 Evidence-grounded decomposition
 
@@ -107,7 +107,7 @@ $$
 \mathcal D_{\phi}(E_t)=\left(F_t,\mathcal R_t,P_t,\rho_t\right),
 $$
 
-where \(F_t=\{f_k\}\) contains entity, attribute, condition, action, outcome, preference, time, constraint, tool and version candidates; \(\mathcal R_t\) contains typed relations; \(P_t\) maps every candidate to exact source spans or tool outputs; and \(\rho_t\) records the extractor version and confidence. A factor may become a treatment unit only if it is traceable to evidence, operationally maskable or replaceable, and accompanied by explicit subject, task and temporal boundaries. An extraction without these properties remains a retrieval feature and cannot authorise a strong governance action.
+where $F_t=\{f_k\}$ contains entity, attribute, condition, action, outcome, preference, time, constraint, tool and version candidates; $\mathcal R_t$ contains typed relations; $P_t$ maps every candidate to exact source spans or tool outputs; and $\rho_t$ records the extractor version and confidence. A factor may become a treatment unit only if it is traceable to evidence, operationally maskable or replaceable, and accompanied by explicit subject, task and temporal boundaries. An extraction without these properties remains a retrieval feature and cannot authorise a strong governance action.
 
 Decomposition provides interventional addressability, not causal discovery. A generated explanation, attention weight or predicate–argument tuple is stored as a candidate measurement. Its causal status is assessed only after a treatment definition, overlap diagnostics and intervention-based or explicitly assumption-dependent estimation. This separation follows the distinction between a learned representation and a verified causal variable emphasised in causal representation learning [@Scholkopf2021CausalRepresentation].
 
@@ -122,7 +122,7 @@ $$
 =\left(r_j,\mathcal S_j,\Gamma_j,\nu_j,\omega_j\right).
 $$
 
-Here, \(r_j\) is a conditional rule candidate, \(\mathcal S_j\) is the non-discardable support set, \(\Gamma_j\) specifies subject, task, time, tool-version and permission scope, \(\nu_j\) is the rule version, and \(\omega_j\) records support count, conflicts and uncertainty. The rule takes the scoped form \(X\rightarrow Y\mid\Gamma_j\), not an unconditional \(X\rightarrow Y\). Scope mismatch, counterevidence or cross-environment sign conflict prevents promotion. This design uses causal-model abstraction as a guide to cross-level consistency without claiming that a language model has recovered the true structural model [@BeckersHalpern2019AbstractingCausalModels].
+Here, $r_j$ is a conditional rule candidate, $\mathcal S_j$ is the non-discardable support set, $\Gamma_j$ specifies subject, task, time, tool-version and permission scope, $\nu_j$ is the rule version, and $\omega_j$ records support count, conflicts and uncertainty. The rule takes the scoped form $X\rightarrow Y\mid\Gamma_j$, not an unconditional $X\rightarrow Y$. Scope mismatch, counterevidence or cross-environment sign conflict prevents promotion. This design uses causal-model abstraction as a guide to cross-level consistency without claiming that a language model has recovered the true structural model [@BeckersHalpern2019AbstractingCausalModels].
 
 The minimum governance unit is an evidence-supported component bundle
 
@@ -148,13 +148,13 @@ The first transition requires complete provenance and scope; the second requires
 
 ### 3.4 Joint-capability error propagation and admission
 
-The two operators are jointly necessary also because abstraction propagates decomposition error. Let \(\epsilon_D\) denote errors in factor boundaries, types, provenance or relations, and let \(\epsilon_A\) denote erroneous merges, omitted scopes or over-generalised rules. We use the following design audit rather than an unqualified statistical bound:
+The two operators are jointly necessary also because abstraction propagates decomposition error. Let $\epsilon_D$ denote errors in factor boundaries, types, provenance or relations, and let $\epsilon_A$ denote erroneous merges, omitted scopes or over-generalised rules. We use the following design audit rather than an unqualified statistical bound:
 
 $$
 \epsilon_R \lesssim \epsilon_A(\mathcal D_\phi(E),\Gamma,P)+L_A\epsilon_D,
 $$
 
-where \(L_A\) measures abstraction sensitivity to candidate perturbations. A rule candidate is admitted only when provenance, scope, independent support and conflict checks pass:
+where $L_A$ measures abstraction sensitivity to candidate perturbations. A rule candidate is admitted only when provenance, scope, independent support and conflict checks pass:
 
 $$
 \operatorname{Admit}(r_j)=\mathbf 1\{\mathrm{Prov}_j\geq\theta_P,\;\mathrm{Scope}_j\geq\theta_\Gamma,\;\mathrm{Support}_j\geq\theta_S,\;\mathrm{Conflict}_j\leq\theta_C\}.
@@ -166,7 +166,7 @@ Candidates that fail remain proposed or fall back to raw evidence. Thus, decompo
 
 ### 4.1 Atomic decision log
 
-Every decision is recorded under a unique decision identifier. The transaction stores: (i) \(H_t\) before treatment; (ii) evidence–factor–rule lineage and extractor versions; (iii) the candidate-generation process and candidate probabilities when stochastic; (iv) the behaviour-policy version, realised \(B_t\) and \(\pi_b(B_t\mid H_t)\); (v) workspace position, token count and jointly exposed components; (vi) adoption diagnostics, plan, tool call or answer; (vii) proximal and terminal outcomes, evaluator version and resource cost; and (viii) \(H_{t+1}\) and the subsequent lifecycle state. The propensity is recorded by the executing policy when the action is sampled. A post-hoc exposure classifier is not treated as a known propensity.
+Every decision is recorded under a unique decision identifier. The transaction stores: (i) $H_t$ before treatment; (ii) evidence–factor–rule lineage and extractor versions; (iii) the candidate-generation process and candidate probabilities when stochastic; (iv) the behaviour-policy version, realised $B_t$ and $\pi_b(B_t\mid H_t)$; (v) workspace position, token count and jointly exposed components; (vi) adoption diagnostics, plan, tool call or answer; (vii) proximal and terminal outcomes, evaluator version and resource cost; and (viii) $H_{t+1}$ and the subsequent lifecycle state. The propensity is recorded by the executing policy when the action is sampled. A post-hoc exposure classifier is not treated as a known propensity.
 
 ### 4.2 Intervention family
 
@@ -177,17 +177,17 @@ Exploration is restricted to simulators, deterministic replay tasks and automati
 3. **Cluster-level masking:** jointly treat near-duplicate or substitutable memories to reduce interference-induced underestimation.
 4. **Rule–evidence comparison:** compare rule-plus-support, support-only and rule-only conditions under equal token and position budgets.
 
-Selected pairs additionally receive a \(2\times2\) factorial intervention to diagnose complementarity or suppression. Production-critical constraints, permissions and irreversible tool actions are placed on a non-explorable list. If a required treatment has no support in the logged policy, the framework reports a positivity violation and defaults to conservative retention or isolation rather than extrapolating a causal value.
+Selected pairs additionally receive a $2\times2$ factorial intervention to diagnose complementarity or suppression. Production-critical constraints, permissions and irreversible tool actions are placed on a non-explorable list. If a required treatment has no support in the logged policy, the framework reports a positivity violation and defaults to conservative retention or isolation rather than extrapolating a causal value.
 
 ### 4.3 Identification assumptions
 
-The proximal and policy estimands require versioned treatment consistency, sequential exchangeability conditional on \(H_t\), positivity over the target policy, measurable outcomes and a candidate or cluster definition that limits interference. These assumptions are diagnosed rather than asserted: we report overlap, effective sample size, weight tails, missingness, evaluator drift, treatment-version variation and sensitivity to cluster definitions. Environment transfer is evaluated by held-out time, task, subject or tool-version slices; stability on observed environments is not presented as a guarantee for arbitrary deployment environments.
+The proximal and policy estimands require versioned treatment consistency, sequential exchangeability conditional on $H_t$, positivity over the target policy, measurable outcomes and a candidate or cluster definition that limits interference. These assumptions are diagnosed rather than asserted: we report overlap, effective sample size, weight tails, missingness, evaluator drift, treatment-version variation and sensitivity to cluster definitions. Environment transfer is evaluated by held-out time, task, subject or tool-version slices; stability on observed environments is not presented as a guarantee for arbitrary deployment environments.
 
 ## 5. Effect and policy-value estimation
 
 ### 5.1 Static doubly robust diagnostic
 
-For a binary component exposure \(Z_{t,k}\), outcome models \(\mu_z(H_t)\) and propensity \(e(H_t)\), the cross-fitted doubly robust pseudo-outcome is
+For a binary component exposure $Z_{t,k}$, outcome models $\mu_z(H_t)$ and propensity $e(H_t)$, the cross-fitted doubly robust pseudo-outcome is
 
 $$
 \widehat\phi_{t,k}=
@@ -207,11 +207,11 @@ SW_T=\prod_{t=1}^{T}
 \frac{P(B_t\mid\bar B_{t-1},X_0)}{P(B_t\mid H_t)},
 $$
 
-where \(X_0\) contains episode-start covariates [@Robins2000MSM]. We report the weight distribution, truncation level, effective sample size and horizon-stratified estimates. For target-policy evaluation, sequential doubly robust off-policy estimators combine stepwise importance ratios with action-value models [@JiangLi2016DROPE; @ThomasBrunskill2016OffPolicy]. An estimator is admitted to public experiments only after it recovers enumerated policy values and policy rankings in controlled environments.
+where $X_0$ contains episode-start covariates [@Robins2000MSM]. We report the weight distribution, truncation level, effective sample size and horizon-stratified estimates. For target-policy evaluation, sequential doubly robust off-policy estimators combine stepwise importance ratios with action-value models [@JiangLi2016DROPE; @ThomasBrunskill2016OffPolicy]. An estimator is admitted to public experiments only after it recovers enumerated policy values and policy rankings in controlled environments.
 
 ### 5.3 Heterogeneity and stability
 
-We estimate conditional effects across task difficulty, subject, component type, time and tool version using cross-fitted pseudo-outcomes with causal forests or R-learners [@WagerAthey2018CausalForest; @NieWager2021RLearner]. For component \(i\) in an observed context \(x\), the stability score is
+We estimate conditional effects across task difficulty, subject, component type, time and tool version using cross-fitted pseudo-outcomes with causal forests or R-learners [@WagerAthey2018CausalForest; @NieWager2021RLearner]. For component $i$ in an observed context $x$, the stability score is
 
 $$
 S_i(x)=
@@ -224,7 +224,7 @@ An abstraction candidate is eligible for activation only if its evidence coverag
 
 ## 6. Risk-sensitive reversible governance
 
-To prevent an erroneous abstraction from propagating to every member of a mechanism group, we introduce a cross-granularity fallback gate. Let \(q_i\) be calibrated representation confidence, \(S_i^{\mathrm{group}}\) the stable group-level causal score and \(S_i^{\mathrm{item}}\) the item-level score when estimable. The abstraction is eligible only when
+To prevent an erroneous abstraction from propagating to every member of a mechanism group, we introduce a cross-granularity fallback gate. Let $q_i$ be calibrated representation confidence, $S_i^{\mathrm{group}}$ the stable group-level causal score and $S_i^{\mathrm{item}}$ the item-level score when estimable. The abstraction is eligible only when
 
 $$
 g_i=\mathbf 1\left\{q_i\geq\theta_q,\;
@@ -234,9 +234,9 @@ I_i=0\;\lor\;\left[
 \right]\right\},
 $$
 
-where \(I_i\) indicates item-level estimability, and the governance score becomes \(S_i^{\mathrm{gate}}=g_iS_i^{\mathrm{group}}+(1-g_i)S_i^{\mathrm{item}}\). If the item-level effect is not estimable because the memory is rare, the system does not treat a sentinel or a wide interval as evidence of harm; it instead relies on provenance, group support and the asymmetric false-forgetting cost. This gate converts representation quality into an explicit coverage--risk trade-off and is ablated into confidence-only, sign-consistency-only and negative-effect-veto variants.
+where $I_i$ indicates item-level estimability, and the governance score becomes $S_i^{\mathrm{gate}}=g_iS_i^{\mathrm{group}}+(1-g_i)S_i^{\mathrm{item}}$. If the item-level effect is not estimable because the memory is rare, the system does not treat a sentinel or a wide interval as evidence of harm; it instead relies on provenance, group support and the asymmetric false-forgetting cost. This gate converts representation quality into an explicit coverage--risk trade-off and is ablated into confidence-only, sign-consistency-only and negative-effect-veto variants.
 
-The governance policy does not collapse all evidence into a scalar importance score. For each component and candidate action \(g\), it evaluates
+The governance policy does not collapse all evidence into a scalar importance score. For each component and candidate action $g$, it evaluates
 
 $$
 Q_i(g\mid x)=
@@ -247,7 +247,7 @@ Q_i(g\mid x)=
 -C_{\mathrm{scope}}\,p_{\mathrm{scope}}(g\mid x),
 $$
 
-and selects \(g_i^*(x)=\arg\max_{g\in\mathcal G_i(x)}Q_i(g\mid x)\). Here, \(\mathcal G_i(x)\) is the set of legally and statistically admissible actions, and \(p_{\mathrm{FF}}\), \(p_{\mathrm{FR}}\) and \(p_{\mathrm{scope}}\) denote estimated false-forgetting, false-retention and scope-violation risks, respectively. The maximisation is subject to permission, withdrawal, retention-period and overlap constraints. \(C_{\mathrm{FF}}\) may substantially exceed \(C_{\mathrm{FR}}\) for rare safety rules, one-time exceptions and high-loss conditions. Uncertain estimates therefore lead to retention, light downweighting or additional data collection rather than deletion.
+and selects $g_i^*(x)=\arg\max_{g\in\mathcal G_i(x)}Q_i(g\mid x)$. Here, $\mathcal G_i(x)$ is the set of legally and statistically admissible actions, and $p_{\mathrm{FF}}$, $p_{\mathrm{FR}}$ and $p_{\mathrm{scope}}$ denote estimated false-forgetting, false-retention and scope-violation risks, respectively. The maximisation is subject to permission, withdrawal, retention-period and overlap constraints. $C_{\mathrm{FF}}$ may substantially exceed $C_{\mathrm{FR}}$ for rare safety rules, one-time exceptions and high-loss conditions. Uncertain estimates therefore lead to retention, light downweighting or additional data collection rather than deletion.
 
 Stable positive components are reinforced or retained. Components that are beneficial only within an identifiable scope are isolated to that scope and restored when its trigger is present. Stable non-positive, high-cost components move through downweighted to archived, preserving a recovery pointer. Drift-induced sign reversal creates a version branch rather than overwriting history. Physical deletion is outside the learned policy and can be triggered only by independent withdrawal, permission, legal-retention or expiry rules; deletion must propagate to indices, caches and derived representations.
 
@@ -323,3 +323,4 @@ The framework governs external, addressable Agent Memory and does not implement 
 ## Related documents
 
 [[07-English-Introduction-Draft|English Introduction]]、[[09-English-Experiments-Draft|English Experiments]]、[[03-因果推断驱动的Agent Memory遗忘框架论文方案|Chinese method and experiment blueprint]]、[[01-核心研究问题与具体设想#5. 完整 Agent Memory 工程架构|Full engineering architecture]]、[[experiments/semantic_gate_a/LongMemEval语义解构Gate-A标注规范|Semantic Gate A]]
+

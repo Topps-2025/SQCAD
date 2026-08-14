@@ -1,6 +1,6 @@
 # 13-self-obscuring 结构消融与还原控制实验报告-20260813：T1/T2 机制证据链
 
-> **本报告执行 `docs/研究逻辑与理论证明/14-Agent-Memory基础理论空缺与下一阶段实验路线-20260813.md` §5/§7 的实验 A（结构消融 W0–W3 + self-confirming 全对比）与实验 B（reduction controls）**。代码 `src/sqcad/self_obscuring_ablation.py`（15 项新测试随全套 239 项通过）；结果 `results/self_obscuring_ablation.json`（12 seeds，seed 21–32）；T1/T2 的严格证明见 `docs/研究逻辑与理论证明/15-self-obscuring形式定理与严格证明-20260813.md`。
+> **本报告执行 `docs/草稿-draft/研究路线与方案/14-Agent-Memory基础理论空缺与下一阶段实验路线-20260813.md` §5/§7 的实验 A（结构消融 W0–W3 + self-confirming 全对比）与实验 B（reduction controls）**。代码 `src/sqcad/self_obscuring_ablation.py`（15 项新测试随全套 239 项通过）；结果 `results/self_obscuring_ablation.json`（12 seeds，seed 21–32）；T1/T2 的严格证明见 `docs/研究逻辑与理论证明/15-self-obscuring形式定理与严格证明-20260813.md`。
 
 **状态：计算验证级 + 形式化证明配套（15-）**。本报告回答：self-obscuring 闭环（治理动作 → 未来候选/证据流 → 未来可识别性 → 后续治理动作）是否是 Agent Memory 持久访问结构**不可约**地产生的机制——把关键结构去掉，现象是否消失。
 
@@ -22,10 +22,11 @@
 
 **精确斜率基准**：K 世界中被错误归档的记忆，从决策点起每个后续步以概率 p=0.6 暴露并产生 τ=10 的错失价值。T1(a)（15- §2.2）预测精确线性斜率
 
-\[
+$$
 \text{slope} = \tau\cdot p\cdot \frac{T-n_{\mathrm{early}}}{T}
 = 10 \times 0.6 \times \frac{1950}{2000} = \mathbf{5.85}
-\]
+
+$$
 
 ——不是近似，是 T1(a) 的精确数值预测（下文多处出现 5.8500 逐位精确，是机制在数值上兑现的形式化断言）。
 

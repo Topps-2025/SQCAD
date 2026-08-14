@@ -55,13 +55,14 @@ flowchart TD
 
 研究最初从 Agent Memory 的存量治理与选择性遗忘文献中观察到：已有方法分别使用时间衰减、频率、语义相关性、结果反馈、query-local 干预、写时显著性、决策压缩或事后归因来管理记忆，但这些目标并不自动等于：
 
-\[
+$$
 \tau_s^\pi
 =
 V_s^\pi(\texttt{keep})
 -
 V_s^\pi(\texttt{archive}),
-\]
+
+$$
 
 其中价值需要覆盖未来任务分布、候选生成、暴露位置、预算竞争、共同记忆干扰、作用域和成本。
 
@@ -191,9 +192,10 @@ V_s^\pi(\texttt{archive}),
 
 条件不足时不强制制造点估计，而输出：
 
-\[
+$$
 \{\texttt{point},\texttt{bound},\texttt{unresolved},\texttt{mismatch}\}.
-\]
+
+$$
 
 这一步将识别条件直接导向框架设计：日志层、证据层、作用域层、随机探测层、部分识别层和 Qualification gate 都不是任意模块拼接，而是对失败机制的操作化回应。
 
@@ -216,11 +218,12 @@ V_s^\pi(\texttt{archive}),
 
 这支持：
 
-\[
+$$
 \text{C1–C8 满足}
 \Rightarrow
 \text{协议路线可恢复当前定义的 lifecycle value}.
-\]
+
+$$
 
 ### 7.2 条件违反与资格门
 
@@ -269,19 +272,21 @@ V_s^\pi(\texttt{archive}),
 
 ### 8.2 得到的结论：未识别类上的门控必要性
 
-Theorem 4 使用 Theorem 1 的观测等价符号翻转对。令规则以概率 \(p\) 选择 `keep`，两个世界中的最坏情况 regret 为：
+Theorem 4 使用 Theorem 1 的观测等价符号翻转对。令规则以概率 $p$ 选择 `keep`，两个世界中的最坏情况 regret 为：
 
-\[
+$$
 \max\bigl((1-p)|\tau_1|,\;p|\tau_2|\bigr).
-\]
 
-对 \(p\) 最小化得到：
+$$
 
-\[
+对 $p$ 最小化得到：
+
+$$
 \frac{|\tau_1||\tau_2|}{|\tau_1|+|\tau_2|}.
-\]
 
-当前构造 \(\tau_1=1650\)、\(\tau_2=-1100\)，下界为 660；最坏情况错误概率至少为 1/2。
+$$
+
+当前构造 $\tau_1=1650$、$\tau_2=-1100$，下界为 660；最坏情况错误概率至少为 1/2。
 
 这证明：
 
@@ -409,10 +414,10 @@ LongMemEval-S 和 LoCoMo 的轨迹审计记录候选、暴露、位置、预算�
 
 按优先级：
 
-1. **一般决策识别定理**：安全提交当且仅当识别集合位于同一动作区域；把 Theorem 4 从两点构造推广到一般 \([L,U]\)。
+1. **一般决策识别定理**：安全提交当且仅当识别集合位于同一动作区域；把 Theorem 4 从两点构造推广到一般 $[L,U]$。
 2. **统一 `commit/defer/probe` 成本**：拒绝不是零成本，探测也不是免费；推导三者的最优决策边界。
-3. **动态探索必要性**：证明策略生成暴露下，无探索存在 \(\Omega(T)\) regret 或 self-confirming non-identifiability。
-4. **探测样本复杂度下界**：用 KL/Le Cam/Fano 等工具刻画达到错误概率 \(\delta\) 所需的最小有效 probe 数量。
+3. **动态探索必要性**：证明策略生成暴露下，无探索存在 $\Omega(T)$ regret 或 self-confirming non-identifiability。
+4. **探测样本复杂度下界**：用 KL/Le Cam/Fano 等工具刻画达到错误概率 $\delta$ 所需的最小有效 probe 数量。
 5. **SQCAD 上界**：证明其 gate/probe policy 在相同假设下达到匹配或近似匹配的 regret/sample-complexity rate。
 6. **修复现有必要性细节**：隔离 C6 测量误差；将 IV 扩展到 lifecycle estimand；收紧 C7/C8 的 estimand/granularity 语义；重新形式化 authorization certificate 与审计性。
 
