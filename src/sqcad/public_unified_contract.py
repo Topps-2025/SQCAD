@@ -86,6 +86,7 @@ CONFLICT_BONUS = 0.15       # conservative retention bonus for conflicted items
 ATTENUATION = 0.8           # QA-time downweight of conflicted items
 RARE_FLOOR = 0.05           # score floor for rare-session items
 PROBE_BUDGET_PER_TASK = 1   # paid probe channel capacity
+CANDIDATE_GUARD_BUDGET = 4  # one-shot proposal/coverage guard capacity
 N_BOOT = 2000
 BOOT_SEED = 20260812        # Gate 5 pre-registered bootstrap seed
 ALPHA = 0.05
@@ -103,7 +104,12 @@ SQCAD_ABLATIONS = (
     "sqcad_no_positive_protection", "sqcad_no_negative_attenuation",
     "sqcad_no_fallback",
 )
-ALL_POLICIES = R1_POLICIES + R2_POLICIES + ("sqcad",) + SQCAD_ABLATIONS
+SQCAD_VARIANTS = (
+    "sqcad_candidate_guard_1", "sqcad_candidate_guard_2",
+    "sqcad_candidate_guard_4",
+)
+ALL_POLICIES = (R1_POLICIES + R2_POLICIES + ("sqcad",)
+                + SQCAD_ABLATIONS + SQCAD_VARIANTS)
 
 SENT_RE = re.compile(r"(?<=[.!?])\s+")
 
@@ -200,6 +206,27 @@ POLICY_SPECS: Dict[str, PolicySpec] = {
                         "eviction, paid probe/restore, attenuated QA ranking",
                         "transportable",
                         "this paper's framework on public traces"),
+    **{
+        name: PolicySpec(
+            f"SQCAD + candidate coverage guard ({budget})",
+            "framework-variant",
+            "SQCAD plus bounded one-shot BM25 candidate probes before access; "
+            "proposals do not authorize persistent writes",
+            "transportable",
+            f"{budget} candidate proposals per QA; persistent authorization "
+            "unchanged")
+        for name, budget in (
+            ("sqcad_candidate_guard_1", 1),
+            ("sqcad_candidate_guard_2", 2),
+            ("sqcad_candidate_guard_4", 4),
+        )
+    },
+    "sqcad_candidate_guard": PolicySpec(
+        "SQCAD + candidate coverage guard (4; legacy alias)",
+        "framework-variant",
+        "Compatibility alias for sqcad_candidate_guard_4",
+        "transportable",
+        "legacy name; equivalent to four candidate proposals per QA"),
     **{ab: PolicySpec(
         "SQCAD ablation: " + ab.removeprefix("sqcad_").replace("_", " "),
         "framework-ablation",
@@ -475,10 +502,20 @@ class SqcadConfig:
     positive_protection: bool = True
     negative_attenuation: bool = True
     fallback: bool = True
+    candidate_guard: bool = False
+    candidate_guard_budget: int = 0
 
 
 SQCAD_ABLATION_CONFIG = {
     "sqcad": SqcadConfig(),
+    "sqcad_candidate_guard_1": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=1),
+    "sqcad_candidate_guard_2": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=2),
+    "sqcad_candidate_guard_4": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=4),
+    "sqcad_candidate_guard": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=4),
     "sqcad_no_qualification": SqcadConfig(qualification=False),
     "sqcad_no_version_gate": SqcadConfig(version_gate=False),
     "sqcad_no_silence_semantics": SqcadConfig(silence_semantics=False,
@@ -575,6 +612,7 @@ def _sqcad_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
     for t in tasks:
         q = set(t.query_tokens)
         overlap = {mid: len(toks[mid] & q) for mid in toks}
+        pool = list(retained)
 
         probe_ids: List[str] = []
         if cfg.probe and cfg.silence_semantics and archived:
@@ -590,7 +628,24 @@ def _sqcad_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
                              "qualification": "probed",
                              "reason": "query_overlap"})
 
-        pool = list(retained)
+        # Coverage guard: association/BM25 may propose missing evidence for
+        # this QA, but the proposal is one-shot and never authorizes a
+        # persistent write.  Qualification remains the only write gate.
+        candidate_probe_ids: List[str] = []
+        if cfg.candidate_guard:
+            all_ranked = sorted(
+                bm25_scores(msgs, t.query_tokens).items(),
+                key=lambda kv: (-kv[1], kv[0]))
+            candidate_probe_ids = [
+                mid for mid, value in all_ranked
+                if value > 0.0 and mid not in pool and mid not in probe_ids
+            ][:cfg.candidate_guard_budget]
+            for mid in candidate_probe_ids:
+                lifecycle["probes"] += 1
+                rows.append({"mid": mid, "action": "candidate_probe",
+                             "qualification": "proposed",
+                             "reason": "coverage_guard"})
+
         if cfg.fallback:
             while len(pool) < BUDGET and archived:
                 fill = max(archived, key=lambda mid: (overlap[mid], mid))
@@ -602,7 +657,8 @@ def _sqcad_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
                              "reason": "short_workspace"})
 
         # exposure pool = persistent store + one-shot probes
-        pool_exposure = pool + probe_ids
+        pool_exposure = list(dict.fromkeys(
+            pool + probe_ids + candidate_probe_ids))
         q_scores = bm25_scores([by[mid] for mid in pool_exposure],
                                t.query_tokens)
         if cfg.negative_attenuation and cfg.qualification:
@@ -1173,6 +1229,11 @@ def main() -> None:
         for ab in SQCAD_ABLATIONS:
             if ab in evals and "sqcad" in evals:
                 pairs.append(("sqcad", ab))
+        for variant in SQCAD_VARIANTS:
+            if variant in evals:
+                for baseline in ("sqcad", "bm25", "keep_all"):
+                    if baseline in evals:
+                        pairs.append((variant, baseline))
         for metric in METRIC_KEYS:
             ds_out["significance"][metric] = significance(evals, metric,
                                                           pairs)

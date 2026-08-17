@@ -18,6 +18,10 @@ models/
 artifacts/
 tmp/
 
+# Remote (AutoDL) run artifacts -- results-like evidence, kept on D drive
+remote_results/
+remote_public_contract_cpu.json
+
 # Secrets and local configuration
 .env
 .env.*

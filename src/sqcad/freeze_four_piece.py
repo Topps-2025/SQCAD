@@ -7,8 +7,9 @@ Generates a DETERMINISTIC SHA-256 manifest over:
              probe budget / cost coefficients / thresholds / evaluator
              constants, plus byte hashes of the two frozen real-data files
              (LongMemEval S, LoCoMo) on the external database;
-  results -- the evidence result JSONs under results/ (gitignored, synced
-             to the D-drive database);
+  results -- the evidence result JSONs under results/ plus the
+             lifecycle_bench corpus (gitignored, synced to the D-drive
+             database);
   reports -- docs/实验证据链/*.md (the evidence-chain reports, including
              this gate's report 08).
 
@@ -98,6 +99,27 @@ CONTRACT_REGISTRY: Dict[str, Any] = {
         "note": "external database, never committed; byte hashes recorded "
                 "below",
     },
+    "lifecycle_bench_contract": {
+        "note": "must match src/sqcad/lifecycle_bench/frozen.py verbatim; "
+                "asserted by tests/test_lifecycle_bench_contract.py "
+                "(TestBuiltDataset.test_manifest_frozen_constants)",
+        "shape": {"version": "v0.1", "horizon": 10,
+                  "episodes_per_family": 200, "control_episodes": 50,
+                  "observation_pairs": 15},
+        "cost_contract": {
+            "gamma": 0.9, "task_value": 10.0, "harm_penalty": 20.0,
+            "exposure_unit": 0.05, "probe_cost": 1.0,
+            "storage_rate": 0.01, "tau_tol": 0.5,
+        },
+        "budgets": {"workspace": 10, "probe_per_task": 1},
+        "lexical_gates": {"adopt_threshold": 2, "probe_threshold": 3,
+                          "requalify_overlap": 2},
+        "proposer_weights": {"recency_w": 0.3, "frequency_w": 0.1,
+                             "negative_attenuation": 10.0},
+        "splits": {"weights": [0.6, 0.2, 0.2]},
+        "seeds": {"base": 20260817, "pair": 20260818, "split": 20260819},
+        "policy": "reference_sqcad",
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -157,6 +179,10 @@ def results_manifest(repo: Path) -> Dict[str, Any]:
     files = sorted(
         p for p in results_dir.glob("*.json")
         if p.name not in ("bootstrap_ci_smoke.json", "freeze_manifest.json"))
+    # the lifecycle-bench corpus ships its own frozen manifest; hash the
+    # whole corpus so the freeze chain covers the dataset layer too
+    files += sorted(
+        p for p in (results_dir / "lifecycle_bench").glob("*.json*"))
     entries = [file_entry(f) for f in files]
     return {"piece": "results", "n_files": len(entries), "files": entries}
 

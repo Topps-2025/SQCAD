@@ -188,6 +188,28 @@ def test_sqcad_probe_restore_and_ablation_contrasts():
     assert sqcad.lifecycle["restores"] >= 0
 
 
+def test_candidate_guard_proposes_without_persistent_authorization():
+    msgs = [
+        _msg("gold", "s0", "", 0, "secret code zebra"),
+        *[_msg(f"m{i}", f"s{i + 1}", "", i + 1,
+               f"unrelated stream item number {i}") for i in range(30)],
+    ]
+    trace = Trace(
+        "candidate-guard", tuple(msgs),
+        (TraceTask("q0", "what is the secret code",
+                   clean_tokens("what is the secret code"),
+                   ("gold",), "2", ""),),
+    )
+    base = _sqcad_run("sqcad", trace)
+    guarded = _sqcad_run("sqcad_candidate_guard", trace)
+    assert "gold" not in base.workspaces["q0"]
+    assert "gold" in guarded.workspaces["q0"]
+    assert "gold" not in guarded.storage_ids
+    assert any(row["action"] == "candidate_probe"
+               and row["qualification"] == "proposed"
+               for row in guarded.rows)
+
+
 def test_sqcad_fallback_ablation():
     # 5 sessions x 4 turns (bundle eviction drops the store to 10 < BUDGET)
     # + one high-frequency 6-turn session that is never the eviction victim;
