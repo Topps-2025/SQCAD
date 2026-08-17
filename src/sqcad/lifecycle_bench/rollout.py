@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from .realizer import RealizedEpisode
-from .world import Rollout, simulate_branch
+from .world import Rollout, RolloutConfig, simulate_branch
 
 
 @dataclass(frozen=True)
@@ -23,10 +23,12 @@ class PairedRollout:
     archive: Rollout
 
 
-def paired_rollout(ep: RealizedEpisode) -> PairedRollout:
-    """Run both branches of one episode under the frozen reference policy."""
-    keep = simulate_branch(ep, "keep")
-    archive = simulate_branch(ep, "archive")
+def paired_rollout(ep: RealizedEpisode,
+                   cfg: RolloutConfig = RolloutConfig()) -> PairedRollout:
+    """Run both branches of one episode under the frozen reference policy
+    (or an ablation configuration)."""
+    keep = simulate_branch(ep, "keep", cfg)
+    archive = simulate_branch(ep, "archive", cfg)
     check_branch_invariance(ep, keep, archive)
     return PairedRollout(ep, keep, archive)
 

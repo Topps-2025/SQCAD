@@ -41,9 +41,9 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from .frozen import (
-    ADOPT_THRESHOLD, FREQUENCY_W, HARM_PENALTY, NEGATIVE_ATTENUATION,
-    PROBE_BUDGET_PER_TASK, PROBE_COST, PROBE_THRESHOLD, RECENCY_W,
-    REQUALIFY_OVERLAP, TASK_VALUE, WORKSPACE_BUDGET,
+    ADOPT_THRESHOLD, EXPOSURE_UNIT, FREQUENCY_W, HARM_PENALTY,
+    NEGATIVE_ATTENUATION, PROBE_BUDGET_PER_TASK, PROBE_COST, PROBE_THRESHOLD,
+    RECENCY_W, REQUALIFY_OVERLAP, STORAGE_RATE, TASK_VALUE, WORKSPACE_BUDGET,
 )
 from .realizer import RealizedEpisode, RealizedFutureItem, RealizedTask, overlap
 from .scenarios import WorldSpec
@@ -73,7 +73,8 @@ _CONFLICT_ROLES = {"old", "new", "critical", "evidence"}
 
 
 def reference_certificate(ep: RealizedEpisode, fid: str,
-                          decision_scope: str) -> CertificateRecord:
+                          decision_scope: str,
+                          lineage: bool = True) -> CertificateRecord:
     """Gold-free qualification: only pre-decision sessions are consulted."""
     m = ep.memory(fid)
     if m.spec.scope != decision_scope and m.spec.scope != "any":
@@ -99,7 +100,7 @@ def reference_certificate(ep: RealizedEpisode, fid: str,
     # not already be event-resolved (an event-corrected fact is not a
     # "conflicting version" -- its successor is the live one).
     conflict = None
-    if m.spec.role in _CONFLICT_ROLES:
+    if lineage and m.spec.role in _CONFLICT_ROLES:
         for other in ep.memories:
             if other.spec.fid == fid or other.spec.role not in _CONFLICT_ROLES:
                 continue
@@ -145,6 +146,33 @@ def _toks(text: str):
 # ---------------------------------------------------------------------------
 # simulation
 # ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class RolloutConfig:
+    """Ablation switches (22- 9 ablation family).  All defaults reproduce the
+    frozen reference behavior exactly; each switch isolates one mechanism:
+
+    qualification -- certificates exist (NEGATIVE attenuation, probe gating,
+                     conflict statuses); ablated = every certificate is
+                     UNRESOLVED (no_qualification ablation)
+    censoring     -- archiving removes the memory from the future candidate
+                     stream; ablated = archived memories keep competing
+                     (no_censoring ablation)
+    restore       -- a probe that earns a slot also restores the memory to
+                     the persistent store; ablated = paid probe without
+                     restore (no_restore ablation)
+    lineage       -- version/lineage conflict detection in the certificate
+                     (no_lineage ablation)
+    probing       -- paid probes (PROBE_BUDGET_PER_TASK) are allowed
+                     (no_probe ablation)
+    """
+
+    qualification: bool = True
+    censoring: bool = True
+    restore: bool = True
+    lineage: bool = True
+    probing: bool = True
+
+
 @dataclass
 class TaskLog:
     slot: int
@@ -190,7 +218,8 @@ def proposer_score(ep: RealizedEpisode, fid: str, q_tokens: Tuple[str, ...],
 
 
 def simulate_task(ep: RealizedEpisode, item: RealizedFutureItem, slot: int,
-                  st: WorldState) -> TaskLog:
+                  st: WorldState,
+                  cfg: RolloutConfig = RolloutConfig()) -> TaskLog:
     """One future task under the frozen reference policy."""
     t = item.task
     assert t is not None, f"slot {slot}: item kind=task without task spec"
@@ -199,13 +228,16 @@ def simulate_task(ep: RealizedEpisode, item: RealizedFutureItem, slot: int,
     log.query, log.scope = t.query, t.spec.scope
     log.needed = t.spec.needed_fid
 
-    # candidates from the persistent store (scope gate + negative attenuation)
+    # candidates from the persistent store (scope gate + negative
+    # attenuation); with censoring ablated, archived memories keep competing
+    pool = st.store if cfg.censoring else (st.store | st.archive)
     candidates = []
-    for fid in sorted(st.store):
+    for fid in sorted(pool):
         m = ep.memory(fid)
         if m.spec.scope != t.spec.scope and m.spec.scope != "any":
             continue
-        candidates.append((fid, proposer_score(ep, fid, q, st), "store"))
+        candidates.append((fid, proposer_score(ep, fid, q, st),
+                           "store" if fid in st.store else "archived"))
     candidates.sort(key=lambda c: (-c[1], _tie_key(c[0])))
     workspace = [fid for fid, _, _ in candidates][:WORKSPACE_BUDGET]
     min_score = min((s for _, s, _ in candidates[:WORKSPACE_BUDGET]),
@@ -213,30 +245,33 @@ def simulate_task(ep: RealizedEpisode, item: RealizedFutureItem, slot: int,
 
     # probes: strongest archived, scope-valid, non-negative, strong overlap
     probes = []
-    archived = [
-        fid for fid in sorted(st.archive)
-        if st.certs.get(fid, UNRESOLVED).status is not NEGATIVE
-        and (ep.memory(fid).spec.scope == t.spec.scope
-             or ep.memory(fid).spec.scope == "any")
-    ]
-    ranked = sorted(
-        archived, key=lambda fid: (-overlap(q, ep.tokens(fid)), _tie_key(fid)))
-    probe_budget = PROBE_BUDGET_PER_TASK
     restored = []
-    for fid in ranked:
-        if probe_budget <= 0:
-            break
-        if overlap(q, ep.tokens(fid)) < PROBE_THRESHOLD:
-            continue
-        score = proposer_score(ep, fid, q, st)
-        if score > min_score:      # earns a slot (strict, budgeted access)
-            workspace.append(fid)
-            restored.append(fid)
-            st.store.add(fid)
-            st.archive.discard(fid)
-        log.probe_cost += PROBE_COST     # paid even when the probe is wasted
-        probes.append(fid)
-        probe_budget -= 1
+    if cfg.probing:
+        archived = [
+            fid for fid in sorted(st.archive)
+            if st.certs.get(fid, UNRESOLVED).status is not NEGATIVE
+            and (ep.memory(fid).spec.scope == t.spec.scope
+                 or ep.memory(fid).spec.scope == "any")
+        ]
+        ranked = sorted(
+            archived,
+            key=lambda fid: (-overlap(q, ep.tokens(fid)), _tie_key(fid)))
+        probe_budget = PROBE_BUDGET_PER_TASK
+        for fid in ranked:
+            if probe_budget <= 0:
+                break
+            if overlap(q, ep.tokens(fid)) < PROBE_THRESHOLD:
+                continue
+            score = proposer_score(ep, fid, q, st)
+            if score > min_score:  # earns a slot (strict, budgeted access)
+                workspace.append(fid)
+                restored.append(fid)
+                if cfg.restore:
+                    st.store.add(fid)
+                    st.archive.discard(fid)
+            log.probe_cost += PROBE_COST  # paid even when the probe is wasted
+            probes.append(fid)
+            probe_budget -= 1
     log.probes = tuple(probes)
     log.restore = tuple(restored)
 
@@ -262,8 +297,8 @@ def simulate_task(ep: RealizedEpisode, item: RealizedFutureItem, slot: int,
     # costs (storage charged on the store during this task, exposure per
     # exposed memory; STORAGE_RATE / EXPOSURE_UNIT live in frozen.py)
     log.storage_cost = sum(ep.memory(fid).spec.storage_tokens
-                           for fid in st.store) * 0.01
-    log.exposure_cost = 0.05 * len(log.workspace)
+                           for fid in st.store) * STORAGE_RATE
+    log.exposure_cost = EXPOSURE_UNIT * len(log.workspace)
 
     # state update
     for fid in log.workspace:
@@ -284,7 +319,7 @@ def simulate_event(ep: RealizedEpisode, item: RealizedFutureItem, slot: int,
     policy-log schema."""
     log = TaskLog(slot=slot)
     log.storage_cost = sum(ep.memory(fid).spec.storage_tokens
-                           for fid in st.store) * 0.01
+                           for fid in st.store) * STORAGE_RATE
     fid = item.event_fid
     if fid is not None:
         old = st.certs.get(fid, UNRESOLVED)
@@ -332,16 +367,23 @@ class Rollout:
         return any(fid in l.restore for l in self.logs)
 
 
-def simulate_branch(ep: RealizedEpisode, action: str) -> Rollout:
+def simulate_branch(ep: RealizedEpisode, action: str,
+                    cfg: RolloutConfig = RolloutConfig()) -> Rollout:
     """Paired rollout of one branch with the frozen reference policy.
 
     Slot 0 runs BEFORE the persistent action is applied (both branches see
     the identical pre-action state), which guarantees the local task is
     branch-independent by construction (22- 3.4 same-source counterfactual).
+    ``cfg`` carries the ablation switches (defaults = frozen behavior).
     """
     certs = {m.spec.fid: reference_certificate(ep, m.spec.fid,
-                                               ep.world.decision_scope)
+                                               ep.world.decision_scope,
+                                               lineage=cfg.lineage)
              for m in ep.memories}
+    if not cfg.qualification:
+        certs = {fid: CertificateRecord(fid, UNRESOLVED,
+                                        "qualification_ablated")
+                 for fid in certs}
 
     introduced = {m.spec.fid for m in ep.memories if m.spec.introduced}
     pre = WorldState(
@@ -401,7 +443,7 @@ def simulate_branch(ep: RealizedEpisode, action: str) -> Rollout:
         if item.spec.kind == "event":
             logs.append(simulate_event(ep, item, slot, st))
         else:
-            logs.append(simulate_task(ep, item, slot, st))
+            logs.append(simulate_task(ep, item, slot, st, cfg))
     return Rollout(action=action, slot0=slot0, logs=tuple(logs),
                    certs=dict(certs))
 

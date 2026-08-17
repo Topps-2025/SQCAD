@@ -258,11 +258,18 @@ def _event_text(world: WorldSpec, entity: str, kind: str, new_value: Optional[st
         return (f"{entity} changed his contact phone number to 555-0199"
                 if new_value else f"{entity} changed his contact phone number")
     if fam == "harmful_stale" or fam == "stable_negative":
-        # the correction negates the stale fact WITHOUT sharing its lexical
-        # content with the good fact: {entity, peanuts} vs the stale fact
-        # (>= REQUALIFY_OVERLAP), only {entity} vs the good fact, so the
-        # good fact's certificate stays POSITIVE.
-        return f"peanuts are no longer part of {entity} diet"
+        # correction REVISION (23- 6.1, dataset-revision round): the old
+        # text ("peanuts are no longer part of {e} diet") shared only the
+        # entity token with the stale fact under exact tokenization
+        # ("peanuts" != "peanut": stem-free), so the lexical-overlap
+        # requalification path (>= REQUALIFY_OVERLAP) was unreachable from
+        # the public layer -- only the fid link fired.  The new text keeps
+        # the exact tokens {entity, peanut}:  overlap 2 with the stale fact
+        # (m_stale/m1: {entity, allergic, peanut}) but overlap 1 with the
+        # good fact (m_good: {entity, allergic, shellfish}) -- so the good
+        # fact's certificate stays POSITIVE and the correction is now
+        # detectable by text-only policies too (R1 identifiability).
+        return f"{entity}: peanuts -- the old peanut fact is wrong"
     raise KeyError(fam)
 
 

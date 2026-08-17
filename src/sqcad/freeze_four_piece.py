@@ -119,6 +119,27 @@ CONTRACT_REGISTRY: Dict[str, Any] = {
         "splits": {"weights": [0.6, 0.2, 0.2]},
         "seeds": {"base": 20260817, "pair": 20260818, "split": 20260819},
         "policy": "reference_sqcad",
+        "audit": {
+            "note": "fairness defenses (23- 7.6); perturbation/knob sets and "
+                    "thresholds pre-registered in 23- 7.7 before running",
+            "r2_perturbations": {
+                "gamma": [0.7, 0.95, 0.99], "harm_penalty": [10.0, 40.0],
+                "storage_rate": [0.005, 0.02],
+                "exposure_unit": [0.02, 0.1], "probe_cost": [0.5, 2.0],
+                "task_value": [5.0, 20.0], "tau_tol": [0.2, 1.0],
+                "adopt_threshold": [1, 3], "probe_threshold": [2, 4],
+                "workspace_budget": [8, 12], "recency_w": [0.1, 0.5],
+                "frequency_w": [0.05, 0.2],
+                "negative_attenuation": [5.0, 20.0],
+                "requalify_overlap": [1, 3],
+                "probe_budget_per_task": [0, 2],
+            },
+            "r2_thresholds": {"robust": 0.05, "fragile": 0.30},
+            "r3_knobs": ["entity", "difficulty", "slot_shift"],
+            "r3_seed_base": 20260901,
+            "r3_episodes_per_bucket": 20,
+            "bootstrap": {"n_boot": 2000, "seed": 20260817},
+        },
     },
 }
 

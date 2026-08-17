@@ -185,6 +185,12 @@ def assign_splits(episodes: List[Tuple[RealizedEpisode, Optional[str]]],
     return out
 
 
+def all_episodes() -> List[RealizedEpisode]:
+    """All 1380 realized episodes (main + observation-equivalent pairs), for
+    audit and baseline tools that recompute rollouts from seeds."""
+    return [ep for ep, _ in _main_episodes() + _pair_episodes()]
+
+
 # ---------------------------------------------------------------------------
 # three-layer serialization
 # ---------------------------------------------------------------------------
