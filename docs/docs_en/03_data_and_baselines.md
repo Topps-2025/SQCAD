@@ -1,36 +1,32 @@
-﻿# Data and baselines
+# Data and baselines
 
-## Data tiers
+## Public data (L2)
 
-| Tier | Dataset | Role | Current status |
-|---|---|---|---|
-| D0 | controlled mechanism world | potential-outcome and scope ground truth | local simulator |
-| D1 | LongMemEval-S | long-term facts, updates and retrieval process | local, hash frozen, retrieval baselines run |
-| D2 | LoCoMo | long-horizon multi-hop and temporal QA | local JSON frozen, reader not unified |
-| D3 | GoodAI-LTM | dynamic retain/revise/update/recovery | repository accessible, endpoint and adapter pending |
-| D4 | MemoryAgentBench | incremental interaction coverage | MIT repository accessible, revision pending |
-| D5 | Gate A | factor/relation/provenance/scope annotation audit | packet template ready, double annotation pending |
-| D6 | randomized micro-intervention | qualification calibration and overlap | design stage |
+| Dataset | Role | Status |
+|---|---|---|
+| LongMemEval-S | long-term facts, updates, retrieval process | frozen; retrieval baselines run; QA via OpenAI endpoint on AutoDL |
+| LoCoMo | long-horizon multi-hop and temporal QA | frozen; official deterministic token-F1 (CPU-only) run |
+
+Unified contract: same chronological stream, workspace budget, reader, evaluator, time split, seeds and cost accounting for every compared method. Results in [02 Experiments](02_experiments.md); per-baseline open-source and no-GPU audit in report `docs/自用/03-实验证据链/15-基线开源状态与无GPU复现审计-20260813.md` (internal).
+
+Reachability facts (web-verified 2026-08-13, unchanged): LongMemEval ICLR 2025 (MIT); LoCoMo ACL 2024 (**CC BY-NC 4.0**); GoodAI-LTM NeurIPS 2024 D&B (MIT, litellm keys are the blocker); MemoryAgentBench ICLR 2026 (MIT); Oblivion **proprietary license** (NEC Laboratories Europe, not redistributed); SimpleMem MIT — the released-version commit `16912523` is frozen separately; FadeMem's public repo is an unrelated video-diffusion project (identity mismatch — no official code found for the Agent Memory paper); DeMem has no official implementation (named behavioral proxy only).
+
+## Self-built data (L3): SQCAD-LifecycleBench
+
+1,380 keep/archive same-source counterfactual episodes: 6 mechanism families × 200 (hitchhiker, rare_bridge, version_update, harmful_stale, self_obscuring, scope_mismatch) + 3 control families × 50 + 15 observationally-equivalent pairs. Each episode contains both keep and archive rollouts under the same future stream; the true long-term outcome lives only in the hidden layer (public trace has no oracle labels). Split train/dev/test = 818/354/208; remote AutoDL rebuild is hash-identical to local. Contract frozen via `frozen.py` (GAMMA=0.9, TAU_TOL=0.5, …) and registered in the freeze manifest.
+
+Build plan: `docs/自用/00-论文主体/22-SQCAD-LifecycleBench数据集构建方案-20260817.md`; full audit report: `docs/自用/03-实验证据链/20-SQCAD-LifecycleBench公允性审计与基线矩阵报告-20260817.md` (internal).
 
 ## Baseline tiers
 
-**Simple controls:** no-memory, keep-all, recency/FIFO/LRU, fixed exponential decay, frequency decay, BM25, dense and BM25+dense RRF.
+**Simple controls:** no-memory, keep-all, recency/FIFO/LRU, fixed exponential decay, frequency decay, storage-size proxies, random50, BM25.
 
-**Governance systems:** SAGE, SimpleMem, FadeMem, Oblivion, Memory Worth and DeMem, only when the paper method, code, data, model, evaluator and protocol can be aligned. Otherwise report `not reproduced` or a clearly named behavioral proxy.
+**Governance systems:** SAGE, SimpleMem, FadeMem, Oblivion, Memory Worth, DeMem — only when paper method, code, data, model, evaluator and protocol can be aligned; otherwise reported `not reproduced` or a clearly named behavioral proxy (agent vs official reproduction reported in separate columns).
 
-**Internal controls:** v3 qualification gate, global qualification, scoped qualification without competition, competition without qualification, no positive protection, no negative attenuation, default-cold unresolved, bounded fallback, no mismatch penalty, item-level causal stable and risk-gated fallback.
+**Internal controls / ablations:** no-censoring, certificate-off, probe/restore-off, lineage-off, association-only access, bounded fallback, no mismatch penalty, scope-literal, event-rule.
 
 ## Fairness contract
 
 Every main-table comparison uses the same candidate stream, reader, prompt, model/tool version, top-k, workspace tokens, storage budget, evaluator, time split, seeds and cost contract. Paper-reported numbers are not local reproductions. Oracle policies are diagnostic upper bounds, not baselines.
 
-## Reachability snapshot (web-verified 2026-08-13; full detail in [BASELINE_AUDIT.md](../BASELINE_AUDIT.md))
-
-- LongMemEval: ICLR 2025 (arXiv 2410.10813); MIT repo and HF data; local S/Oracle data and upstream commit are frozen. The M split is still missing locally. BM25 retrieval is pure CPU (locally run); the QA judge needs an OpenAI API key (or a 70B vLLM GPU); dense retrievers hard-code CUDA.
-- LoCoMo: ACL 2024 (arXiv 2402.17753); repo public, `LICENSE.txt` resolves to **CC BY-NC 4.0** (GitHub metadata says `NOASSERTION`). `data/locomo10.json` is in-repo (2.8 MB). The official QA metric is a deterministic token-F1 — no LLM judge, CPU-only; only answer generation needs API/GPU.
-- GoodAI-LTM: NeurIPS 2024 D&B (arXiv 2409.20222); MIT LICENSE file (metadata stale); data bundled in-repo; every LLM call goes through litellm — API keys are the blocker, GPU is not needed.
-- MemoryAgentBench: ICLR 2026 (arXiv 2507.05257); MIT repo and HF dataset; string metrics are CPU; the GPT-4o judge covers two subsets.
-- Oblivion: local source snapshot at commit `b2512f9`; Python 3.12, Poetry and API endpoints are required for full benchmarks. **License is proprietary (NEC Laboratories Europe)** — not open source; the snapshot stays in the external database and is not redistributed.
-- SimpleMem: MIT repo (aiming-lab/SimpleMem). The current main branch contains post-paper Omni/EvolveMem changes. Commit `16912523` (`released version`, 2026-01-02) is frozen separately as the original paper-release candidate. Its LoCoMo protocol requires GPT-4.1-mini (API key) and Qwen3-Embedding-0.6B (CPU-runnable, slow).
-- FadeMem: the `aniki-ly/FadeMem` repository is arXiv:2606.10671 (autoregressive video diffusion), not the cited Agent Memory forgetting paper arXiv:2601.18642. Identity mismatch — excluded until an official Agent Memory implementation appears. No official code found for 2601.18642.
-- DeMem: no official implementation found (arXiv 2605.10870); the algorithm is disclosed and a behavioral proxy is used in the unified contract.
+Fairness defenses R1–R8 are preregistered (metadata shortcuts, parameter sensitivity, unseen mechanisms, verification regions, independent implementation, human anchoring, release package, iteration log) — verdicts in [02 Experiments](02_experiments.md) and report 20.

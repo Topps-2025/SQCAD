@@ -4,7 +4,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-255%20passing-success)](tests/)
+[![Tests](https://img.shields.io/badge/tests-360%20passing-success)](tests/)
 
 > **Propose broadly. Qualify cautiously. Focus competitively.**
 > Access decays. Source evidence survives. Belief is scoped.
@@ -40,9 +40,11 @@ Three states that are often conflated are kept separate:
 
 This repository is a **research artifact with rigorous controlled evidence**, not a deployed system and not a SOTA claim:
 
-- ✅ **Verified (strict proofs + controlled numerics):** memory-specific identification gaps — observational equivalence with opposite optimal actions, query-local causal effects insufficient for lifecycle decisions, source averages not automatically transportable (Theorems 1–2, Corollary 1); a self-obscuring lifecycle theorem: any committed policy without a recovery channel has regret `Θ(T)` while recovery gives `O(1/qρ)` (T1, `docs/研究逻辑与理论证明/15-…`); reduction separation: no faithful feedback-preserving reduction to standard bandit/OPE without an evidence-availability state (T2, `16-…`); minimax probing lower bounds with matching order (P4); qualification-gated recovery of known lifecycle values under identification conditions C1–C8, with all five tested violations caught as `unresolved`/`mismatch`.
+- ✅ **Verified (strict proofs + controlled numerics):** memory-specific identification gaps — observational equivalence with opposite optimal actions, query-local causal effects insufficient for lifecycle decisions, source averages not automatically transportable (Theorems 1–2, Corollary 1); a self-obscuring lifecycle theorem: any committed policy without a recovery channel has regret `Θ(T)` while recovery gives `O(1/qρ)` (T1, `docs/自用/01-research-gap/研究逻辑与理论证明/15-…`); reduction separation: no faithful feedback-preserving reduction to standard bandit/OPE without an evidence-availability state (T2, `16-…`); minimax probing lower bounds with matching order (P4); qualification-gated recovery of known lifecycle values under identification conditions C1–C8, with all five tested violations caught as `unresolved`/`mismatch`.
 - ✅ **Verified (controlled unified-contract benchmarks):** 18-policy main table and cost contract (`results/`, gitignored, hash-frozen) — see `docs/docs_en/02_experiments.md`.
-- ⏳ **Not yet done:** public end-to-end comparison on LongMemEval-S / LoCoMo with a real LLM reader (`docs/草稿-draft/实验方案与基线/17-…`); official R3 reproductions of model-dependent baselines (no GPU / no API key on the current machine — status per baseline in `docs/实验证据链/15-基线开源状态与无GPU复现审计-20260813.md`).
+- ✅ **Verified (public data, unified contract, AutoDL GPU re-checked):** on LongMemEval-S / LoCoMo, the original SQCAD's shortcoming was evidence never entering the one-shot exposure pool; minimal fix **Guard-1** (≤1 BM25 candidate into the read pool; persistent-write authorization unchanged) raises LoCoMo official token-F1 0.0344 → 0.0455 — see `docs/docs_en/02_experiments.md`, report 19.
+- ✅ **Verified (self-built benchmark + fairness audit):** SQCAD-LifecycleBench — 1,380 keep/archive counterfactual episodes, public/hidden truth separation, remote rebuild hash-identical; R1–R5/R7 defenses passed, all 13 preregistered verdicts hit; three framework changes quantified (lineage conflict → archive +8.62 significant) — see report 20.
+- ⏳ **Not yet done:** official R3 reproductions of model-dependent baselines (per-baseline status in `docs/自用/03-实验证据链/15-基线开源状态与无GPU复现审计-20260813.md`); dense/RRF (official weights unavailable); R6 human anchoring; Phase B end-to-end.
 - ❌ **Not claimed:** SOTA on any public benchmark; causal discovery from observational success; universal scope transport; physical deletion guarantees.
 
 ## Quick start
@@ -53,7 +55,7 @@ cd SQCAD
 python -m venv .venv
 # Windows: .\.venv\Scripts\Activate.ps1   |  POSIX: source .venv/bin/activate
 pip install -e ".[dev]"
-PYTHONPATH=src python -m pytest tests/ -q          # 255 tests, CPU-only, no API keys
+PYTHONPATH=src python -m pytest tests/ -q          # 360 tests, CPU-only, no API keys
 ```
 
 Run a controlled smoke experiment (CPU-only, deterministic):
@@ -84,14 +86,14 @@ SQCAD/
 │   ├── cost_contract_experiment.py  # lifecycle net-benefit contract
 │   ├── freeze_four_piece.py         # code–config–results–reports SHA-256 freeze
 │   └── ...
-├── tests/                           # 255 deterministic unit/protocol checks
+├── tests/                           # 360 deterministic unit/protocol checks
 ├── tools/                           # Gate A annotation, diagram rendering
 ├── docs/
 │   ├── assets/                      # architecture diagram (SVG + PNG)
-│   ├── docs_en/                     # English research and presentation docs
-│   ├── docs_zn/                     # Chinese research notes, proofs, evidence records
-│   ├── 实验证据链/                   # numbered experiment reports (evidence chain)
-│   └── 研究逻辑与理论证明/            # numbered theory/proof documents
+│   ├── docs_cn/                     # Chinese GitHub-facing docs (精炼)
+│   ├── docs_en/                     # English GitHub-facing docs
+│   └── 自用/                        # internal: 00-论文主体 / 01-research-gap /
+│                                    #          02-历史草稿 / 03-实验证据链 (00–21)
 └── results/                         # gitignored; hash-frozen and synced to external DB
 ```
 
@@ -99,21 +101,21 @@ SQCAD/
 
 All main-table comparisons share one **unified contract**: the same chronological candidate stream (no future leakage), reader, prompt, context/token budget, evaluator, seeds and cost contract. Every policy is a black box that only sees the current-timepoint stream; the runner executes actions, advances time and scores future held-out QA.
 
-Three tiers (`docs/实验证据链/15-基线开源状态与无GPU复现审计-20260813.md` has the per-baseline detail):
+Three tiers (`docs/自用/03-实验证据链/15-基线开源状态与无GPU复现审计-20260813.md` has the per-baseline detail):
 
 | Tier | Contents | Status |
 |---|---|---|
 | **R1 reproducible controls** | no-memory, keep-all, FIFO/LRU, recency, fixed/frequency decay, BM25, dense, BM25+dense RRF | ✅ in-repo, CPU-only |
 | **R2 structural controls** | association-only, query-local/CMI proxy, item-level causal, bundle-level, no-restore/probe, SQCAD ablations | ✅ in-repo, CPU-only |
-| **R3 official systems** | SimpleMem, Oblivion, Memory Worth, FadeMem, DeMem, SAGE, MemAudit, GateMem | ⏳ official reproductions blocked without GPU/API keys; frozen commits and per-baseline paths in `docs/实验证据链/15-基线开源状态与无GPU复现审计-20260813.md` |
+| **R3 official systems** | SimpleMem, Oblivion, Memory Worth, FadeMem, DeMem, SAGE, MemAudit, GateMem | ⏳ official reproductions blocked without GPU/API keys; frozen commits and per-baseline paths in `docs/自用/03-实验证据链/15-基线开源状态与无GPU复现审计-20260813.md` |
 
-Benchmarks: LongMemEval-S (local, hash-frozen, retrieval baselines run) · LoCoMo (local, frozen) · GoodAI-LTM / MemoryAgentBench (accessibility audited).
+Benchmarks: LongMemEval-S · LoCoMo (unified contract executed, AutoDL GPU re-checked, Guard-1 fix verified) · SQCAD-LifecycleBench (self-built, 1,380 episodes, fairness-audited) · GoodAI-LTM / MemoryAgentBench (accessibility audited).
 
 ## Documentation
 
 - [Overview](docs/docs_en/00_overview.md) · [Method](docs/docs_en/01_method.md) · [Experiments](docs/docs_en/02_experiments.md) · [Data & baselines](docs/docs_en/03_data_and_baselines.md) · [Reproducibility & status](docs/docs_en/04_reproducibility_and_status.md)
-- [Baseline audit](docs/实验证据链/15-基线开源状态与无GPU复现审计-20260813.md) — per-baseline open-source status, CPU/no-GPU reproduction analysis
-- Chinese lab record: [研究总图](docs/docs_zn/00-研究总图.md) · [实验证据链](docs/实验证据链/00-实验报告与当前结论.md) · [研究逻辑与理论证明](docs/研究逻辑与理论证明/README.md)
+- [Baseline audit](docs/自用/03-实验证据链/15-基线开源状态与无GPU复现审计-20260813.md) — per-baseline open-source status, CPU/no-GPU reproduction analysis
+- Chinese lab record: [研究总图](docs/docs_cn/00-研究总图.md) · [实验证据链](docs/自用/03-实验证据链/00-实验报告与当前结论.md) · [研究逻辑与理论证明](docs/自用/01-research-gap/研究逻辑与理论证明/README.md)
 
 ## Citation
 

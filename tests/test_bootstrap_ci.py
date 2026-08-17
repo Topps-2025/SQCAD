@@ -223,14 +223,14 @@ def _make_tmp_repo(tmp_path: Path) -> Path:
     (tmp_path / "src" / "sqcad").mkdir(parents=True)
     (tmp_path / "tests").mkdir(parents=True)
     (tmp_path / "results").mkdir(parents=True)
-    (tmp_path / "docs" / "实验证据链").mkdir(parents=True)
+    (tmp_path / "docs" / "自用" / "03-实验证据链").mkdir(parents=True)
     (tmp_path / "src" / "sqcad" / "core.py").write_text(
         "VALUE = 1\n", encoding="utf-8")
     (tmp_path / "tests" / "test_core.py").write_text(
         "def test(): pass\n", encoding="utf-8")
     (tmp_path / "results" / "main.json").write_text(
         json.dumps({"a": 1}), encoding="utf-8")
-    (tmp_path / "docs" / "实验证据链" / "00-总览.md").write_text(
+    (tmp_path / "docs" / "自用" / "03-实验证据链" / "00-总览.md").write_text(
         "# report\n", encoding="utf-8")
     db = tmp_path / "database"
     (db / "datasets" / "LongMemEval").mkdir(parents=True)

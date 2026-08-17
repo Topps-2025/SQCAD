@@ -2,7 +2,7 @@
 
 Executes the W0-W3 structural-ablation matrix, the reduction control groups
 (static bandit / contextual bandit / standard OPE), and the self-confirming
-policy comparison of `docs/研究逻辑与理论证明/14-Agent-Memory基础理论空缺与下一阶段实验路线-20260813.md`
+policy comparison of `docs/自用/01-research-gap/研究逻辑与理论证明/14-Agent-Memory基础理论空缺与下一阶段实验路线-20260813.md`
 (14- §5 缺口 A/B, §7.1/§7.2/§7.3, §10 执行顺序 3/4).
 
 The question the module answers: is the "self-confirming unidentifiability"

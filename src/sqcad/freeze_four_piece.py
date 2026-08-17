@@ -209,7 +209,7 @@ def results_manifest(repo: Path) -> Dict[str, Any]:
 
 
 def reports_manifest(repo: Path) -> Dict[str, Any]:
-    files = sorted((repo / "docs" / "实验证据链").glob("*.md"))
+    files = sorted((repo / "docs" / "自用" / "03-实验证据链").glob("*.md"))
     entries = [file_entry(f) for f in files]
     return {"piece": "reports", "n_files": len(entries), "files": entries}
 

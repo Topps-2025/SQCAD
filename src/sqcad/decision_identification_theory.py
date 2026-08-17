@@ -1,4 +1,4 @@
-"""P0-P4 upgrades per 13-必要性证明方向 (docs/研究逻辑与理论证明/13-...).
+"""P0-P4 upgrades per 13-必要性证明方向 (docs/自用/01-research-gap/研究逻辑与理论证明/13-...).
 
 P0-1 lemma_a2: C6 isolation.  The TRUE adoption mechanism is unchanged;
     only the OBSERVED proxy is polluted.  Protocol-route estimates are

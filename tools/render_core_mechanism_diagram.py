@@ -174,7 +174,7 @@ def main() -> None:
     fig = make_figure()
     outputs = [
         repo / "docs" / "assets" / "sqcad-core-mechanism-20260813",
-        repo / "docs" / "docs_zn" / "03-核心问题与框架设计" / "框架图"
+        repo / "docs" / "docs_cn" / "03-核心问题与框架设计" / "框架图"
         / "12-SQCAD-Core-Mechanism",
     ]
     for base in outputs:

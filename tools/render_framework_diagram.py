@@ -1,7 +1,7 @@
 """Render the SQCAD framework engineering diagram (v2026-08-13).
 
 Deterministic matplotlib rendering of the current frozen framework design,
-aligned with docs/研究逻辑与理论证明/14-* 16.9-16.10 (Evidence censorship
+aligned with docs/自用/01-research-gap/研究逻辑与理论证明/14-* 16.9-16.10 (Evidence censorship
 awareness, Qualification-as-authorization, Access with restore/probe,
 Decision with identification sets) and the frozen source code:
 
@@ -259,7 +259,7 @@ def main() -> None:
 
     outputs = [
         repo / "docs" / "assets" / "sqcad-framework-20260813",
-        repo / "docs" / "docs_zn" / "03-核心问题与框架设计" / "框架图"
+        repo / "docs" / "docs_cn" / "03-核心问题与框架设计" / "框架图"
               / "13-SQCAD-Framework-20260813",
     ]
     for base in outputs:
