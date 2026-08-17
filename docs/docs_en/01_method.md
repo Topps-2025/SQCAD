@@ -2,15 +2,15 @@
 
 ## Problem formulation
 
-At task time `t`, the system receives a target scope `s_t` containing task, user, tool, model/version, risk and policy metadata. A shared candidate proposer returns candidates `C_t` and inexpensive association scores `r_i,t`. Each candidate has immutable evidence records and a scoped qualification state:
+At task time $t$, the system receives a target scope $s_t$ containing task, user, tool, model/version, risk and policy metadata. A shared candidate proposer returns candidates $C_t$ and inexpensive association scores $r_{i,t}$. Each candidate has immutable evidence records and a scoped qualification state:
 
-`Q(i, s) ∈ {positive, negative, unresolved, mismatch}`.
+$$Q(i, s) \in \{\text{positive},\ \text{negative},\ \text{unresolved},\ \text{mismatch}\}.$$
 
 Only qualified evidence may modify persistent access policy. Access remains reversible and source evidence is never deleted.
 
 ## Candidate guard
 
-Relevance candidates are proposed broadly (BM25 is the static coverage upper bound and cost control, not a governance method). To repair evidence coverage without relaxing persistent-write authorization, at most `k` top proposed candidates enter the current read pool in addition to qualified candidates. Guard-1 (`k=1`, chronologically restricted, one-shot exposure) is the minimal fix evaluated on public data; Guard-2/4 trade more coverage for more probe/restore cost. The guard never changes the persistent qualification state by itself.
+Relevance candidates are proposed broadly (BM25 is the static coverage upper bound and cost control, not a governance method). To repair evidence coverage without relaxing persistent-write authorization, at most $k$ top proposed candidates enter the current read pool in addition to qualified candidates. Guard-1 ($k=1$, chronologically restricted, one-shot exposure) is the minimal fix evaluated on public data; Guard-2/4 trade more coverage for more probe/restore cost. The guard never changes the persistent qualification state by itself.
 
 ## Permission layer
 
@@ -26,18 +26,13 @@ The qualification interface must expose its evidence, threshold, calibration, au
 
 ## Access layer
 
-For a candidate `i` in scope `s` and task `t`, a pre-registered access logit can be written as:
+For a candidate $i$ in scope $s$ and task $t$, a pre-registered access logit can be written as:
 
-```text
-z(i,s,t) = r(i,t) + α·positive(i,s) − β·negative(i,s)
-           − γ·scope_mismatch(i,s) − η·cost(i)
-```
+$$z(i,s,t) = r(i,t) + \alpha\,\mathrm{positive}(i,s) - \beta\,\mathrm{negative}(i,s) - \gamma\,\mathrm{scope\_mismatch}(i,s) - \eta\,\mathrm{cost}(i)$$
 
-The logits are projected to a fixed workspace budget `B_t`, for example by a temperature-controlled normalized allocation:
+The logits are projected to a fixed workspace budget $B_t$, for example by a temperature-controlled normalized allocation:
 
-```text
-a(i,s,t) = B_t · exp(z(i,s,t)/T) / Σ_j exp(z(j,s,t)/T)
-```
+$$a(i,s,t) = B_t \cdot \frac{\exp(z(i,s,t)/T)}{\sum_j \exp(z(j,s,t)/T)}$$
 
 The implementation may use a discrete top-k or sparse projection, but the main experiment freezes one implementation before testing. Increasing access mass for qualified evidence automatically reduces the relative mass available to other candidates; focus and decay are two views of the same budget projection.
 
@@ -47,13 +42,11 @@ The online path records candidate generation, exposure, position, adoption, acti
 
 ## Decision layer
 
-A persistent commit requires provable qualification. With identification bounds `(L, U)` from the qualification layer, the decision rule compares three options under one cost contract:
+A persistent commit requires provable qualification. With identification bounds $(L, U)$ from the qualification layer, the decision rule compares three options under one cost contract:
 
-```text
-min{ R*(L,U),  C_defer,  C_probe + R*_after_probe }
-```
+$$\min\{R^*(L,U),\ C_{\text{defer}},\ C_{\text{probe}} + R^*_{\text{after\_probe}}\}$$
 
-where `R*(L,U) = U(−L)/(U−L)` is the minimax regret of committing. The identification set must not cross the action boundary; otherwise the action stays unresolved, defers, or pays for a probe/restore that reopens the evidence channel. Archive-induced silence is censoring, not negative evidence: evidence starvation caused by a past action must be distinguishable from true non-value before any further decay.
+where $R^*(L,U) = \frac{U(-L)}{U-L}$ is the minimax regret of committing. The identification set must not cross the action boundary; otherwise the action stays unresolved, defers, or pays for a probe/restore that reopens the evidence channel. Archive-induced silence is censoring, not negative evidence: evidence starvation caused by a past action must be distinguishable from true non-value before any further decay.
 
 ## Complexity and boundary
 

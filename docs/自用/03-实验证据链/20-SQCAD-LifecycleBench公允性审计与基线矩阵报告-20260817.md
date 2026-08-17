@@ -7,7 +7,7 @@
 
 | 防线 | 判据（预注册） | 结果 | 判定 |
 |---|---|---|---|
-| R1 元数据捷径 | 分栏报告；一致率上界 = 1−15/1380 = 0.9891 | metadata(family,variant) train 0.989 → test 0.740；text-only test 0.740；**无任何 public-trace 特征可超过上界** | ✅ 评价不可被猜 |
+| R1 元数据捷径 | 分栏报告；一致率上界 $= 1 - \frac{15}{1380} = 0.9891$ | metadata(family,variant) train 0.989 → test 0.740；text-only test 0.740；**无任何 public-trace 特征可超过上界** | ✅ 评价不可被猜 |
 | R2 标签敏感性 | <5% 稳健 / 5–30% 敏感区 / >30% 脆弱需重定位 | **fragile**：GAMMA=0.7 → 36.2%、TAU_TOL=1.0 → 32.6%；7 项入敏感区；其余稳健 | ⚠️ 脆弱→重定位（§3） |
 | R3 未见机制 | 一致率 ≥0.9 且无反向翻转；pair 家族以配对翻转确认率为主判据 | 15 cell 中 12 全转移；hitchhiker pair 翻转 100% 确认；3 个机制边界如实报告 | ✅ 泛化可被挑战 |
 | R4 必胜区预注册 | §7.7 表 13 行逐 bucket 对照 | **13 行全部命中，无一失准** | ✅ 预注册纪律 |
@@ -67,8 +67,8 @@
 | HARM_PENALTY、TASK_VALUE、RECENCY_W、FREQUENCY_W、NEGATIVE_ATTENUATION、REQUALIFY_OVERLAP 全部、PROBE_BUDGET 2 | — | 0.0 | 稳健 |
 
 **重定位说明（预注册判据执行，不改标签）**：
-1. 脆弱常数是**经济参数与判定参数**，非生成噪声：GAMMA 直接决定远期价值贴现（0.7 使远期任务价值近乎消失 → 大量 keep→archive 翻转）；TAU_TOL 是 oracle 判定阈值（0.5→1.0 把 tau∈[0.5,1.0] 的 keep/archive 重分类为 neutral）。二者敏感是价值函数定义使然，不是标签随机性。
-2. 本批标签的有效域：**GAMMA∈[0.9, 0.99] 区间**（0.95/0.99 下 flip 仅 3.6%，均落在 TAU_TOL 边缘的临界 episode）；TAU_TOL 敏感区与 R3 的机制边界发现互相印证（rescue 移位后 tau 跌破 0.5 → neutral，同一 TAU_TOL 敏感性）。
+1. 脆弱常数是**经济参数与判定参数**，非生成噪声：GAMMA 直接决定远期价值贴现（0.7 使远期任务价值近乎消失 → 大量 keep→archive 翻转）；TAU_TOL 是 oracle 判定阈值（0.5→1.0 把 $\tau \in [0.5, 1.0]$ 的 keep/archive 重分类为 neutral）。二者敏感是价值函数定义使然，不是标签随机性。
+2. 本批标签的有效域：**GAMMA $\in [0.9, 0.99]$ 区间**（0.95/0.99 下 flip 仅 3.6%，均落在 TAU_TOL 边缘的临界 episode）；TAU_TOL 敏感区与 R3 的机制边界发现互相印证（rescue 移位后 $\tau$ 跌破 0.5 → neutral，同一 TAU_TOL 敏感性）。
 3. 语义类常数（HARM_PENALTY 含场景重建、TASK_VALUE、权重类、词法门槛）全部 0.0 翻转——**场景设计的语义结论不依赖这些常数的具体取值**。
 4. 外部使用者应按冻结 manifest 参数（frozen.py）解释标签；如需跨 GAMMA 迁移结论，须在本报告标注的重定位区间内讨论。
 
@@ -78,9 +78,9 @@
 
 - **12/15 cell 全转移**（≥0.9 一致率、无 reversal）：entity/difficulty 全部；slot_shift 中 rare_bridge/rescue_impossible、self_obscuring/crowding、version_update、harmful_stale、scope_mismatch、stable_*、hitchhiker_pair（配对确认率 1.0）。
 - **3 个机制边界（如实报告，非标签错误——evaluator 为同一诚实反事实）**：
-  1. `rare_bridge/rescue_possible` slot_shift：一致率 0.35。救援任务由 slot 2 移至 3–5 后 tau∈{0.19,0.34,0.51}，仅 0.51>0.5 的保持 keep，其余退化为 neutral；
-  2. `self_obscuring/rescue_possible` slot_shift：一致率 0.0。tau∈{0.16,0.31,0.49} 全部 <TAU_TOL → neutral；
-  3. `neutral/default` slot_shift（该家族无救援任务，knob 退化为决策记忆存储大小 6/12 tokens）：一致率 0.0。storage 扰动使 tau 0→{−0.65,−1.0}，中性平衡偏 archive。
+  1. `rare_bridge/rescue_possible` slot_shift：一致率 0.35。救援任务由 slot 2 移至 3–5 后 $\tau \in \{0.19, 0.34, 0.51\}$，仅 $0.51 > 0.5$ 的保持 keep，其余退化为 neutral；
+  2. `self_obscuring/rescue_possible` slot_shift：一致率 0.0。$\tau \in \{0.16, 0.31, 0.49\}$ 全部 $< \mathrm{TAU\_TOL}$ → neutral；
+  3. `neutral/default` slot_shift（该家族无救援任务，knob 退化为决策记忆存储大小 6/12 tokens）：一致率 0.0。storage 扰动使 $\tau$ 0→$\{-0.65, -1.0\}$，中性平衡偏 archive。
 - **判据修正（R8 日志 #7）**：`_flip_pair_slot` 原只改 needed_fid 未同步 `decision_action_label`（MVP 中 flip 侧 label=keep），误报 20 个假 reversal；修复后配对翻转确认率 = 1.0（base 在新槽位 archive ∧ flip 在新槽位 keep，同一公开 trace）。
 - 机制边界解读：rescue 收益是**贴现位置敏感**的（方向保持、强度跌破判定阈值）；neutral 平衡对存储规模敏感。二者为机制可迁移性的真实边界，不否定场景设计的内部有效性（原设计 tau 与阈值有 0.18–0.34 余量）。
 

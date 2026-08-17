@@ -5,9 +5,9 @@ SQCAD (**S**cope-qualified, **Q**uasi-causal **C**onditioning for **A**gent memo
 The central problem is not relevance ranking. When the long-term value of a persistent `keep/archive` action is not identifiable from current observations, a relevance score must not be treated as authorization. SQCAD separates:
 
 - **Evidence** — immutable source records and provenance, with censoring awareness (silence caused by archive is not evidence of low value); proposes candidates.
-- **Qualification** — scope- and version-specific states `{positive, negative, unresolved, mismatch}` that authorize — or refuse — persistent change.
+- **Qualification** — scope- and version-specific states $\{\text{positive},\ \text{negative},\ \text{unresolved},\ \text{mismatch}\}$ that authorize — or refuse — persistent change.
 - **Access** — per-task competitive allocation under a fixed workspace budget, with keep / downweight / archive / restore / probe as formal, reversible actions.
-- **Decision** — a persistent commit requires provable qualification: the identification set must not cross the action boundary, or `min{ R*(L,U), C_defer, C_probe + R*_after }` selects commit / defer / probe.
+- **Decision** — a persistent commit requires provable qualification: the identification set must not cross the action boundary, or $\min\{R^*(L,U),\ C_{\text{defer}},\ C_{\text{probe}} + R^*_{\text{after}}\}$ selects commit / defer / probe.
 
 Qualification is conditional, not global: the same memory can be positive in one scope and unresolved or mismatched in another. Scope is a falsifiable conditional-denoising assumption, not a proven guarantee.
 
@@ -15,7 +15,7 @@ Qualification is conditional, not global: the same memory can be positive in one
 
 | Layer | Content | Key results |
 |---|---|---|
-| L1 Theory | T1/T2/P4 formalization: regret Θ(T) without a recovery channel vs O(1/qρ) with qualified recovery; reduction separation from bandit/OPE; minimax probing lower bounds | Frozen as minimal framework conditions |
+| L1 Theory | T1/T2/P4 formalization: regret $\Theta(T)$ without a recovery channel vs $O(1/(q\rho))$ with qualified recovery; reduction separation from bandit/OPE; minimax probing lower bounds | Frozen as minimal framework conditions |
 | L2 Public | LongMemEval-S + LoCoMo under a unified contract, chronological stream, AutoDL GPU re-check | Original SQCAD's shortcoming was evidence never entering the one-shot exposure pool, not qualification-layer ranking; minimal fix Guard-1 (≤1 BM25 candidate into the read pool; persistent-write authorization unchanged) raises LoCoMo official token-F1 0.0344 → 0.0455 |
 | L3 Self-built | SQCAD-LifecycleBench: 1,380 keep/archive same-source counterfactual episodes, public/hidden truth separation, remote rebuild hash-identical | Directly measures lifecycle value, regret, false-commit, probe, restore; oracle upper bound +0.964, probe-willing +0.865; three framework changes quantified |
 | Audit | R1–R5, R7 complete (truth independently checkable / failures possible / generalization challengeable / evaluation not guessable); R2 fragile parameters relocated; R6 human anchoring pending external judges | All 13 preregistered verdicts hit |

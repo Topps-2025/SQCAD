@@ -27,20 +27,20 @@ Three states that are often conflated are kept separate:
 
 1. **Evidence** — immutable source records and provenance. Silence is *not* low value: archive-induced starvation must be distinguishable from true non-value (censoring awareness).
 2. **Qualification** — scoped, evidence-backed permission to change persistent access policy. The gate outputs an *identification state*, not a single score:
-   `Q(i,s) ∈ {point, bound, unresolved, mismatch}`.
+   $Q(i,s) \in \{\text{point},\ \text{bound},\ \text{unresolved},\ \text{mismatch}\}$.
    Associational signals (BM25, dense, recency, co-occurrence) may *propose* candidates; they never *authorize*.
-3. **Access** — per-task allocation of a fixed budget. A pre-registered logit combines proposal score and qualification state,
+3. **Access** — per-task allocation of a fixed budget. A pre-registered logit combines proposal score and qualification state:
 
-   `z(i,s,t) = r(i,t) + α·positive(i,s) − β·negative(i,s) − γ·scope_mismatch(i,s) − η·cost(i)`,
+   $$z(i,s,t) = r(i,t) + \alpha\,\mathrm{positive}(i,s) - \beta\,\mathrm{negative}(i,s) - \gamma\,\mathrm{scope\_mismatch}(i,s) - \eta\,\mathrm{cost}(i)$$
 
-   then projects to the budget `a = B · Project(z/T)`, `Σᵢ aᵢ = B`. Focus and decay are **one** budget-reallocation mechanism — archive/downweight are reversible, and paid `restore`/`probe` channels keep the correction path open.
-4. **Decision** — a persistent commit requires provable qualification: the identification set must not cross the action boundary, or the three-way comparison `min{ R*(L,U), C_defer, C_probe + R*_after }` selects commit.
+   then projects to the budget $a = B \cdot \operatorname{Project}(z/T)$, with $\sum_i a_i = B$. Focus and decay are **one** budget-reallocation mechanism — archive/downweight are reversible, and paid `restore`/`probe` channels keep the correction path open.
+4. **Decision** — a persistent commit requires provable qualification: the identification set must not cross the action boundary, or the three-way comparison $\min\{R^*(L,U),\ C_{\text{defer}},\ C_{\text{probe}} + R^*_{\text{after}}\}$ selects commit.
 
 ## Evidence boundary (read this before citing)
 
 This repository is a **research artifact with rigorous controlled evidence**, not a deployed system and not a SOTA claim:
 
-- ✅ **Verified (strict proofs + controlled numerics):** memory-specific identification gaps — observational equivalence with opposite optimal actions, query-local causal effects insufficient for lifecycle decisions, source averages not automatically transportable (Theorems 1–2, Corollary 1); a self-obscuring lifecycle theorem: any committed policy without a recovery channel has regret `Θ(T)` while recovery gives `O(1/qρ)` (T1, `docs/自用/01-research-gap/研究逻辑与理论证明/15-…`); reduction separation: no faithful feedback-preserving reduction to standard bandit/OPE without an evidence-availability state (T2, `16-…`); minimax probing lower bounds with matching order (P4); qualification-gated recovery of known lifecycle values under identification conditions C1–C8, with all five tested violations caught as `unresolved`/`mismatch`.
+- ✅ **Verified (strict proofs + controlled numerics):** memory-specific identification gaps — observational equivalence with opposite optimal actions, query-local causal effects insufficient for lifecycle decisions, source averages not automatically transportable (Theorems 1–2, Corollary 1); a self-obscuring lifecycle theorem: any committed policy without a recovery channel has regret $\Theta(T)$ while recovery gives $O(1/(q\rho))$ (T1, `docs/自用/01-research-gap/研究逻辑与理论证明/15-…`); reduction separation: no faithful feedback-preserving reduction to standard bandit/OPE without an evidence-availability state (T2, `16-…`); minimax probing lower bounds with matching order (P4); qualification-gated recovery of known lifecycle values under identification conditions C1–C8, with all five tested violations caught as `unresolved`/`mismatch`.
 - ✅ **Verified (controlled unified-contract benchmarks):** 18-policy main table and cost contract (`results/`, gitignored, hash-frozen) — see `docs/docs_en/02_experiments.md`.
 - ✅ **Verified (public data, unified contract, AutoDL GPU re-checked):** on LongMemEval-S / LoCoMo, the original SQCAD's shortcoming was evidence never entering the one-shot exposure pool; minimal fix **Guard-1** (≤1 BM25 candidate into the read pool; persistent-write authorization unchanged) raises LoCoMo official token-F1 0.0344 → 0.0455 — see `docs/docs_en/02_experiments.md`, report 19.
 - ✅ **Verified (self-built benchmark + fairness audit):** SQCAD-LifecycleBench — 1,380 keep/archive counterfactual episodes, public/hidden truth separation, remote rebuild hash-identical; R1–R5/R7 defenses passed, all 13 preregistered verdicts hit; three framework changes quantified (lineage conflict → archive +8.62 significant) — see report 20.

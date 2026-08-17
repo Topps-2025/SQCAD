@@ -52,7 +52,7 @@ Memory Worth 类方法：从历史检索-结果日志中构造 success/failure �
 | 目标记忆 m* 的真实效应 | 对下游任务有正向因果作用 | 对下游任务无因果作用 |
 | 共同暴露机制 | m* 独立被检索 | m* 只在另一条真正有用的记忆 m' 被检索时才被共同检索 |
 | 任务难度 confounding | 无 | m* 被检索时恰逢简单任务 |
-| 历史日志 (C, E, Y) | 分布 P₁ | 分布 P₂ = P₁（构造使二者相等） |
+| 历史日志 $(C, E, Y)$ | 分布 $P_1$ | 分布 $P_2 = P_1$（构造使二者相等） |
 | archive m* 后的未来效用 | 显著下降 | 不变或上升 |
 
 **关键约束**：$P_{M_1}(C_{1:H}, E_{1:H}, Y_{1:H}) = P_{M_2}(C_{1:H}, E_{1:H}, Y_{1:H})$。
@@ -82,7 +82,7 @@ M₂（混杂世界）：
 
 | 基线 | 在 M₁ 中对 m* 的评分 | 在 M₂ 中对 m* 的评分 | 问题 |
 | --- | --- | --- | --- |
-| Memory Worth (success/failure ratio) | 高 | 高（因 co-exposure confounding） | 无法区分 M₁ 和 M₂ |
+| Memory Worth (success/failure ratio) | 高 | 高（因 co-exposure confounding） | 无法区分 $M_1$ 和 $M_2$ |
 | Recency / Frequency | 相同 | 相同 | 仅依赖时间/频率 |
 | FadeMem-like decay | 相同 | 相同 | 仅依赖时间和频次衰减 |
 
@@ -109,15 +109,15 @@ CMI 类方法：在固定 query 上运行 no-memory / with-memory / perturbed-me
 
 **合成世界设计**：
 
-构造两个记忆 m₁ 和 m₂，它们的 query-local intervention effect 相同，但 persistent access 改变后的未来轨迹价值相反。
+构造两个记忆 $m_1$ 和 $m_2$，它们的 query-local intervention effect 相同，但 persistent access 改变后的未来轨迹价值相反。
 
-| 要素 | 记忆 m₁（短期有用，长期有害） | 记忆 m₂（短期无用，长期有用） |
+| 要素 | 记忆 $m_1$（短期有用，长期有害） | 记忆 $m_2$（短期无用，长期有用） |
 | --- | --- | --- |
-| query-local effect Δ_t(i) | +1.5（当前答案改善） | +1.5（当前答案改善） |
+| query-local effect $\Delta_t(i)$ | +1.5（当前答案改善） | +1.5（当前答案改善） |
 | 对未来 candidate stream 的影响 | 增加 noise candidate | 引入 rare but critical 后续候选 |
 | 对 co-memory 的影响 | 挤占 workspace，排挤关键记忆 | 不挤占（token-light） |
 | 对 policy update 的影响 | 使 policy 偏向检索 noise | 使 policy 保留 rare task 的检索路径 |
-| persistent rollout V^π(keep) - V^π(archive) | 负值（应 archive） | 正值（应 keep） |
+| persistent rollout $V^\pi(\text{keep}) - V^\pi(\text{archive})$ | 负值（应 archive） | 正值（应 keep） |
 
 **数据生成过程**：
 
@@ -147,15 +147,15 @@ m₂（短期无用，长期有用）：
 
 | 基线 | 对 m₁ 的建议 | 对 m₂ 的建议 | 问题 |
 | --- | --- | --- | --- |
-| CMI (Δ_t > 0 → keep) | keep | keep | 对 m₁ 错误（应 archive） |
-| CMI (Δ_t > threshold → keep) | keep | keep | 同上 |
+| CMI ($\Delta_t > 0 \to$ keep) | keep | keep | 对 $m_1$ 错误（应 archive） |
+| CMI ($\Delta_t >$ threshold $\to$ keep) | keep | keep | 同上 |
 | Memory Worth | keep（高共现） | keep（高共现） | 两条都错或对一错一 |
 
 ### 2.5 验证指标
 
 - **局部效应等价性**：验证 source period 中 $\Delta(m_1) = \Delta(m_2)$（统计不显著差异）
 - **lifecycle value 符号相反**：验证 $V^\pi(\text{keep}) - V^\pi(\text{archive})$ 对 m₁ < 0，对 m₂ > 0
-- **CMI 决策遗憾**：若 CMI 对两者都建议 keep → 对 m₁ 产生 regret > 0
+- **CMI 决策遗憾**：若 CMI 对两者都建议 keep → 对 $m_1$ 产生 regret > 0
 - **结论**：query-local effect 相同 + lifecycle value 相反 → 局部效应不足以支撑生命周期决策
 
 ---
@@ -176,11 +176,11 @@ $\mathbb{E}_{s \sim P_{\text{source}}}[\tau(s)]$ 一般不能替代 $\tau(s^*)$�
 
 构造三个作用域：$s_1$（常规任务）、$s_2$（高风险任务）、$s^*$（目标部署环境）。
 
-| 要素 | s₁（常规任务） | s₂（高风险任务） | s*（目标环境） |
+| 要素 | $s_1$（常规任务） | $s_2$（高风险任务） | $s^*$（目标环境） |
 | --- | --- | --- | --- |
-| 记忆 m 的真实 τ(s) | +0.8 | -2.0（保留会触发有害行为） | +1.5 |
+| 记忆 m 的真实 $\tau(s)$ | +0.8 | -2.0（保留会触发有害行为） | +1.5 |
 | scope 在 source 中的权重 | 0.6 | 0.4 | — |
-| source 加权平均 τ | 0.6×0.8 + 0.4×(-2.0) = -0.32 | — | +1.5 |
+| source 加权平均 $\tau$ | $0.6\times 0.8 + 0.4\times(-2.0) = -0.32$ | — | +1.5 |
 
 **数据生成过程**：
 
@@ -209,7 +209,7 @@ target scope s*（新部署环境）：
 
 | 基线 | 对 m 的建议 | 问题 |
 | --- | --- | --- |
-| OPE/MSM (source average) | archive（平均 τ < 0） | target scope 中应 keep，产生 regret |
+| OPE/MSM (source average) | archive（平均 $\tau < 0$） | target scope 中应 keep，产生 regret |
 | Memory Worth (overall) | 取决于整体共现 | 不区分 scope |
 | CMI (source average) | archive | 同 OPE |
 

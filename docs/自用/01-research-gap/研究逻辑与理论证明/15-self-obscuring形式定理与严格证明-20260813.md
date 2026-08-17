@@ -4,7 +4,7 @@
 >
 > 声称纪律：T1 的 (a)(b)(c) 三个方向均给出完整数学证明（构造 + 信息论 + 概率）；T2 给出 reduction 的定义、反证论证与数值对应，但"任意 reduction 必须加入 evidence-availability state"的形式化证明（需固定 reduction 语言）标注为论证级，如实区分。
 
-> **升级标注（2026-08-13 第二批）**：T2 的严格化已完成于 `16-T2严格reduction-separation与P4minimax探测下界`——定义 1（faithful feedback-preserving reduction，五条可验证性质，含 φ 世界无关性——即 §3.4 所述"信息集单调性约定"的精确形式化）、引理 3（配对耦合化约不变性）、引理 4（逐点后悔恒等式）、定理 2（max regret ≥ ½τp(T−n_early) = Θ(T) 对任何忠实化约成立）、推论 2/3（次线性 ⟺ 显式增加证据可得性状态）。§3.2 的"论证级"由此升级为严格证明；§3.4 的"如实标注"保留作为历史记录，数值对应见 `实验证据链/14-` §2–3。
+> **升级标注（2026-08-13 第二批）**：T2 的严格化已完成于 `16-T2严格reduction-separation与P4minimax探测下界`——定义 1（faithful feedback-preserving reduction，五条可验证性质，含 $\phi$ 世界无关性——即 §3.4 所述"信息集单调性约定"的精确形式化）、引理 3（配对耦合化约不变性）、引理 4（逐点后悔恒等式）、定理 2（max regret $\ge \tfrac12 \tau p(T-n_{\text{early}}) = \Theta(T)$ 对任何忠实化约成立）、推论 2/3（次线性 $\iff$ 显式增加证据可得性状态）。§3.2 的"论证级"由此升级为严格证明；§3.4 的"如实标注"保留作为历史记录，数值对应见 `实验证据链/14-` §2–3。
 
 ---
 
@@ -108,7 +108,7 @@ restore 前每步损失 $\tau p$，故 $\mathbb E[R_T] \le \tau p \cdot \mathbb 
 | 0.05 | 120 | 141.7 | 0.425 |
 | 0.2 | 30 | 36.8 | 0.110 |
 
-修正时间与 $\tau p/q$ 同阶（需要 $\lceil \theta$ 越阈所需观测数 $\rceil \approx 1$，因 $\tau = 10 \gg \theta = 2$；理论界 600/120/30 与经验 818/142/37 比值 1.1–1.4，常数因子内一致）；斜率随 $q$ 严格递减（q=0.01→0.2：2.454→0.110，单调），与定理的 $O(1/q)$ 一致。**平台不是免费的**：q 越大概率越小但探测成本越高——上界把这一权衡显式化（与 Gate 4 成本合同 λ_probe 通道对接）。
+修正时间与 $\tau p/q$ 同阶（需要 $\lceil \theta$ 越阈所需观测数 $\rceil \approx 1$，因 $\tau = 10 \gg \theta = 2$；理论界 600/120/30 与经验 818/142/37 比值 1.1–1.4，常数因子内一致）；斜率随 $q$ 严格递减（q=0.01→0.2：2.454→0.110，单调），与定理的 $O(1/q)$ 一致。**平台不是免费的**：$q$ 越大概率越小但探测成本越高——上界把这一权衡显式化（与 Gate 4 成本合同 $\lambda_{\text{probe}}$ 通道对接）。
 
 ### 2.4 T1(c)：候选支持独立于 action 时下界消失
 
@@ -128,7 +128,7 @@ $$
 | 方向 | 结构 | 结果 | 数值 |
 |---|---|---|---|
 | (a) 下界 | 持久 archive + $p_{\text{arch}}=0$ + 无 restore | $R_T = \tau p (T - n_{\text{early}}) = \Theta(T)$ | slope 5.8500 精确（6 个策略） |
-| (b) 上界 | + $q>0$ restore | $\mathbb E[R_T] \le \tau p/(q\rho) + O(1/q)$，与 $T$ 无关 | corr 763→118→37 随 q 递减 |
+| (b) 上界 | + $q>0$ restore | $\mathbb E[R_T] \le \tau p/(q\rho) + O(1/q)$，与 $T$ 无关 | corr 763→118→37 随 $q$ 递减 |
 | (c) 消失 | $p_{\text{arch}} = p$（W0/W1） | $\mathbb E[R_T] = O(1)$ | slope 0.044 / 0.066 |
 
 ---
@@ -143,7 +143,7 @@ $$
 
 *反设*：存在 reduction $\mathcal R$ 保持即时 reward 与动作集合、不引入证据可得性状态，且对所有实例把原问题嵌入到某可解类（静态/contextual bandit、有 overlap 的 OPE）使最优策略 regret 为 $o(T)$。
 
-取 T1(a) 中的实例：K 世界，$p_{\text{arch}}=0$，错误提交 archive。$\mathcal R$ 不引入新状态 ⇒ 新领域中策略的信息集仍是原观测流的函数，且 archived 状态下仍无观测 ⇒ 沉默冻结（引理 2）在新领域保持 ⇒ 任何固定提交的错误动作无法被新领域的任何信息修正 ⇒ 存在策略（原 committing policy 的像）在 $\mathcal R$ 嵌入中保持 $\Omega(T)$ regret，与"可解类中所有最优策略 $o(T)$"矛盾。∎
+取 T1(a) 中的实例：K 世界，$p_{\text{arch}}=0$，错误提交 archive。$\mathcal R$ 不引入新状态 $\Rightarrow$ 新领域中策略的信息集仍是原观测流的函数，且 archived 状态下仍无观测 $\Rightarrow$ 沉默冻结（引理 2）在新领域保持 $\Rightarrow$ 任何固定提交的错误动作无法被新领域的任何信息修正 $\Rightarrow$ 存在策略（原 committing policy 的像）在 $\mathcal R$ 嵌入中保持 $\Omega(T)$ regret，与"可解类中所有最优策略 $o(T)$"矛盾。∎
 
 *结论*：要么 reduction 必须加入证据可得性状态（等价于显式建模 restore channel / lineage——这正是 SQCAD 的 Access/Qualification 层语义），要么放弃保持即时 reward 与动作集合。**"不把未来证据可得性作为状态，普通 reduction 无法保持原问题的反馈语义"**（`14-` §6 T2 的结论句）。
 

@@ -37,7 +37,7 @@ Controlled-simulator output is useful for module decisions and failure analysis;
 | LifecycleBench build | done | 1,380 episodes, hash-consistent, 47 contract tests (report 20) |
 | Fairness audit R1–R5, R7 | done | four channels green; R2 relocated to valid domain |
 | Framework changes | done | 3 verdicts: lineage→archive, hitchhiker→archive, scope lookahead → Phase B |
-| R6 human anchoring | pending external | 28 blinded cases exported, κ ≥ 0.6 criterion |
+| R6 human anchoring | pending external | 28 blinded cases exported, $\kappa \ge 0.6$ criterion |
 | Named baseline extensions | pending | FadeMem/Oblivion/Memory Worth/DeMem/SimpleMem under unified contract (agent vs official columns) |
 | Phase B end-to-end | pending | freeze reader/LLM/tools, switch only persistent state; first validation of scope lookahead |
 | dense/RRF | blocked | official weights unavailable (documented in report 19) |

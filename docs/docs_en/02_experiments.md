@@ -12,11 +12,11 @@
 ## L1 controlled evidence (frozen, hash-frozen results)
 
 - **Gap construction (Theorems 1–2, Corollary 1)** — observationally equivalent worlds with opposite optimal lifecycle actions; exactly equal query-local causal effects with opposite lifecycle values; source-average transport failure. Baselines get the *correct* answers and still fail — the gap is at the estimand layer.
-- **Identification recovery (Theorem 3)** — under conditions C1–C8, the protocol route recovers known lifecycle values (bias ≈ 0, honest CIs, zero confident errors); all five tested condition violations are caught as `unresolved`/`mismatch`.
-- **Necessity (Lemma A–D, Theorems 4–5)** — committing rules on unidentified classes carry regret bounds and error probability ≥ 1/2; `R*(L,U) = U(−L)/(U−L)`.
-- **Self-obscuring lifecycle (T1)** — committed no-recovery policies: regret Θ(T) (exact slope reproduced, e.g. 5.85); qualified recovery: O(1/qρ), independent of T; W0–W3 structural ablations.
-- **Reduction separation (T2)** — every faithful feedback-preserving reduction without an evidence-availability state keeps Θ(T) worst-case regret; paired identity verified bit-exact for all four policies.
-- **Minimax probing (P4)** — detection lower bound `E[probes] ≥ log(1/δ)/KL` and regret decomposition hold on the full grid; order-matching upper bounds.
+- **Identification recovery (Theorem 3)** — under conditions C1–C8, the protocol route recovers known lifecycle values (bias $\approx 0$, honest CIs, zero confident errors); all five tested condition violations are caught as `unresolved`/`mismatch`.
+- **Necessity (Lemma A–D, Theorems 4–5)** — committing rules on unidentified classes carry regret bounds and error probability $\ge 1/2$; $R^*(L,U) = \frac{U(-L)}{U-L}$.
+- **Self-obscuring lifecycle (T1)** — committed no-recovery policies: regret $\Theta(T)$ (exact slope reproduced, e.g. 5.85); qualified recovery: $O(1/(q\rho))$, independent of $T$; W0–W3 structural ablations.
+- **Reduction separation (T2)** — every faithful feedback-preserving reduction without an evidence-availability state keeps $\Theta(T)$ worst-case regret; paired identity verified bit-exact for all four policies.
+- **Minimax probing (P4)** — detection lower bound $\mathbb{E}[\text{probes}] \ge \frac{\log(1/\delta)}{\operatorname{KL}}$ and regret decomposition hold on the full grid; order-matching upper bounds.
 - **Cost contract** — lifecycle net benefit over four price regimes; break-even probe price 110× default; forced restore in unidentified-harm worlds pushes V 38.62 → 8.73.
 
 ## L2 public data (unified contract, AutoDL GPU re-checked)
@@ -56,7 +56,7 @@ Significant vs the reference certificate (95% CI excludes 0): conflict variant +
 | Generalization challengeable | R3 unseen-mechanism holdout | 12/15 transfer + 3 honest mechanism boundaries ✅ |
 | Evaluation not guessable | R1 metadata-shortcut upper bound + R4 preregistered 13 rows + R7 release package | all hit ✅ |
 
-R2 sensitivity: GAMMA=0.7 (36.2% flips) and TAU_TOL=1.0 (32.6%) are fragile — economic/judgment parameters, relocated to the valid domain GAMMA∈[0.9,0.99]; semantic constants flip 0%. R6 human anchoring (28 blinded cases) pending external judges.
+R2 sensitivity: GAMMA=0.7 (36.2% flips) and TAU_TOL=1.0 (32.6%) are fragile — economic/judgment parameters, relocated to the valid domain $\mathrm{GAMMA}\in[0.9,0.99]$; semantic constants flip 0%. R6 human anchoring (28 blinded cases) pending external judges.
 
 ## Primary metrics
 

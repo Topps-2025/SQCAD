@@ -27,8 +27,8 @@
 |---|---|---|
 | 历史成功共现被策略生成暴露混杂（Memory Worth 自己报告的 hitchhiker 共检索不可区分） | 关联信号只提案、不授权 | Evidence 层与 Qualification 层分离 |
 | CMI 类 query-local 效应精确正确仍可能做错生命周期决策（future candidate / budget / interference 未进入 estimand） | 持久访问动作是 treatment，局部效应只是后果链的一段 | Theorem 2 + Access 层 treatment 语义 |
-| 写时治理（GovMem/SAGE）不覆盖访问时授权；衰减治理（Oblivion/FadeMem）无识别资格检验 | "写时资格 ≠ 访问时授权"，衰减触发证据需要资格 | Qualification 门输出 {point, bound, unresolved, mismatch} |
-| 压缩治理（DeMem）的决策对象是下游答案质量而非持久动作价值；审计（MemAudit）是事后归因而非前瞻授权 | 决策中心视图 + 可撤回授权 | 成本合同 V 与资格→动作接口 |
+| 写时治理（GovMem/SAGE）不覆盖访问时授权；衰减治理（Oblivion/FadeMem）无识别资格检验 | "写时资格 ≠ 访问时授权"，衰减触发证据需要资格 | Qualification 门输出 $\{\text{point},\ \text{bound},\ \text{unresolved},\ \text{mismatch}\}$ |
+| 压缩治理（DeMem）的决策对象是下游答案质量而非持久动作价值；审计（MemAudit）是事后归因而非前瞻授权 | 决策中心视图 + 可撤回授权 | 成本合同 $V$ 与资格→动作接口 |
 | 最接近先验 Trivium 的 treatment 是预设 SCM 的 confounder 探针、无策略反馈候选流建模 | 探针是手段之一；识别意识是必经原则 | Theorem 4 + 识别路线分类学（`12` 文档） |
 
 ---
@@ -39,7 +39,7 @@
 
 | 命题 | 构造 | 关键数字 | 证明的 gap |
 |---|---|---|---|
-| A（Theorem 1） | 两 SCM 共享随机序列、完美共暴露：全字段 max diff = 0.0（25,000 行联合日志逐位一致），lifecycle 却为 +1650 / −1100 | Memory Worth 在 M₂ regret = 1100 | 观测日志在信息论层面无法识别 lifecycle value——换正确的因果估计器也失败 |
+| A（Theorem 1） | 两 SCM 共享随机序列、完美共暴露：全字段 max diff = 0.0（25,000 行联合日志逐位一致），lifecycle 却为 +1650 / −1100 | Memory Worth 在 $M_2$ regret = 1100 | 观测日志在信息论层面无法识别 lifecycle value——换正确的因果估计器也失败 |
 | B（Theorem 2） | 两条记忆 query-local 真 do-effect 精确相等（2.000），lifecycle 却为 −1784 / +1776 | CMI observational regret = 1784 | 局部效应**精确已知**也不足以做生命周期决策 |
 | C（Corollary 1） | source 数据完全相同的两世界，target 机制不同 | target world 1 错误决策 regret ≈ 2.0 | source 平均不自动 transport |
 
@@ -68,13 +68,13 @@
 | 定理 | 内容 | 验证方式与关键数字 | 状态 |
 |---|---|---|---|
 | Theorem 1 | 观测等价、lifecycle 符号翻转（观测不可识别） | 命题 A：max diff 0.0、+1650/−1100、regret 1100 | ✅ 构造证明 + 代码验证 |
-| Theorem 2 | 局部效应精确相等、lifecycle 相反（局部不充分） | 命题 B：Δ_do=2.000 相等、−1784/+1776、regret 1784 | ✅ 同上 |
+| Theorem 2 | 局部效应精确相等、lifecycle 相反（局部不充分） | 命题 B：$\Delta_{\mathrm{do}}=2.000$ 相等、−1784/+1776、regret 1784 | ✅ 同上 |
 | Corollary 1 | source 不自动 transport | 命题 C | ✅ 同上 |
-| Theorem 3 | C1–C8（**可操作、可审计的充分授权条件族**，2026-08-13 更名）下协议/观测双路识别；条件失败输出 {point, bound, unresolved, mismatch} | Stage 1：bias≈MC 噪声、CI 12/12、自信错误 0、unresolved 恰为 neutral；Stage 2：五种违反全部被门捕获 | ✅ 充分方向已验证（观测路 lifecycle DR 尚为 g-formula 级） |
-| Theorem 4 | 未识别类上 committing 规则最坏情况 regret ≥ \|τ₁\|\|τ₂\|/(\|τ₁\|+\|τ₂\|)、错误概率 ≥ 1/2；突破需拒绝或新证据 | 双世界实例：660 @ p=0.6；错误 ≥ 0.5；门控 0 | ✅ 证明 + 计算验证（两点构造版） |
+| Theorem 3 | C1–C8（**可操作、可审计的充分授权条件族**，2026-08-13 更名）下协议/观测双路识别；条件失败输出 $\{\text{point},\ \text{bound},\ \text{unresolved},\ \text{mismatch}\}$ | Stage 1：bias $\approx$ MC 噪声、CI 12/12、自信错误 0、unresolved 恰为 neutral；Stage 2：五种违反全部被门捕获 | ✅ 充分方向已验证（观测路 lifecycle DR 尚为 g-formula 级） |
+| Theorem 4 | 未识别类上 committing 规则最坏情况 regret $\ge \vert\tau_1\vert\,\vert\tau_2\vert/(\vert\tau_1\vert+\vert\tau_2\vert)$、错误概率 $\ge 1/2$；突破需拒绝或新证据 | 双世界实例：660 @ p=0.6；错误 ≥ 0.5；门控 0 | ✅ 证明 + 计算验证（两点构造版） |
 | Theorem 4(c′)→审计性 | 拒绝触发必须可验证 | 论证成立但 13- 指出需独立形式化（authorization certificate：soundness/verifiability/non-triviality） | ⚠️ 待升级（P0） |
-| **T1 self-obscuring lifecycle theorem**（14- §6；严格证明 `15`） | (a) 任意无恢复 committing 策略在错误审查世界 R_T = τ·p·(T−n_early) = Θ(T)（精确斜率 5.85 = 10×0.6×1950/2000）；(b) q>0 恢复 ⇒ E[R_T] ≤ O(1/(qρ))，与 T 无关；(c) p_arch=p 时下界消失 | W0–W3 消融（`实验证据链/13`）：W2 精确 5.8500 vs W0 0.0440（去审查即失效）；恢复平台 0.4250；restore sweep 单调（corr 818/142/37） | ✅ 严格证明（引理 1/2 + 定理 1，15-）+ 12-seed 数值 |
-| **T2 reduction separation**（14- §7.2；严格证明 `16`） | 任何忠实 feedback-preserving reduction（定义 1：动作集合/即时 reward/观测信息保持 + φ 世界无关 + 保真）若不加证据可得性状态，则 max regret ≥ ½τp(T−n_early) = Θ(T)（定理 2；配对恒等式 regret_K+regret_A ≡ τp(T−n_early) 对任意策略逐点成立，引理 4） | controls：W0/W1 全部有效（slope ≤0.075），W2 全部精确 5.8500；`实验证据链/14`：配对恒等式 4 策略逐位精确 11700.0、忠实像上 5.8500 精确、禁止 φ 控制 0.0000、不被审查的 contextual_bandit ≈0.03 | ✅ **严格证明**（定义 1/2 + 引理 3/4 + 定理 2 + 推论 2/3，`16`）+ 12-seed 数值 |
+| **T1 self-obscuring lifecycle theorem**（14- §6；严格证明 `15`） | (a) 任意无恢复 committing 策略在错误审查世界 $R_T = \tau\cdot p\cdot(T-n_{\mathrm{early}}) = \Theta(T)$（精确斜率 5.85 = 10×0.6×1950/2000）；(b) $q>0$ 恢复 $\Rightarrow \mathbb{E}[R_T] \le O(1/(q\rho))$，与 $T$ 无关；(c) $p_{\mathrm{arch}}=p$ 时下界消失 | W0–W3 消融（`实验证据链/13`）：W2 精确 5.8500 vs W0 0.0440（去审查即失效）；恢复平台 0.4250；restore sweep 单调（corr 818/142/37） | ✅ 严格证明（引理 1/2 + 定理 1，15-）+ 12-seed 数值 |
+| **T2 reduction separation**（14- §7.2；严格证明 `16`） | 任何忠实 feedback-preserving reduction（定义 1：动作集合/即时 reward/观测信息保持 + $\phi$ 世界无关 + 保真）若不加证据可得性状态，则 max regret $\ge \frac{1}{2}\tau p(T-n_{\mathrm{early}}) = \Theta(T)$（定理 2；配对恒等式 $regret_K+regret_A \equiv \tau p(T-n_{\mathrm{early}})$ 对任意策略逐点成立，引理 4） | controls：W0/W1 全部有效（slope $\le$ 0.075），W2 全部精确 5.8500；`实验证据链/14`：配对恒等式 4 策略逐位精确 11700.0、忠实像上 5.8500 精确、禁止 $\phi$ 控制 0.0000、不被审查的 contextual_bandit $\approx$ 0.03 | ✅ **严格证明**（定义 1/2 + 引理 3/4 + 定理 2 + 推论 2/3，`16`）+ 12-seed 数值 |
 | Lemma A–D | C2/C3、C6、C7、C8 存在替代/退守路线（N1 不成立） | C6 bias 0.49/0.30 vs se 1.4；C7 bundle 8.97±1.12 vs 8.07；IV −0.003 vs 观测偏倚 +0.835；C8 +21.4 vs 当期 1.07 | ✅ 代码验证（**C1/C4/C5 未逐项处理，不声称全族不必要**） |
 
 ### 3.2 框架反推实验（`03`/`04` 报告）
@@ -89,7 +89,7 @@
 
 ### 3.4 成本与收益实验（`07`/`08` 报告）
 
-- **成本合同** V = Σγ^{t-1}[U − λ_tok·C_tok − λ_llm·C_llm − λ_probe·C_probe − λ_lat·C_lat − ρ_harm·R_harm] − ρ_ff·R_ff（λ_llm=0 如实标注）：SQCAD 默认/风险规避/延迟敏感区间最优（38.48）；对最优非探测基线 break-even λ_probe*=5.53（110× 默认）；探测预算受限（pb=0）领先 CMI +6.6；**保留的负面结果**：强制恢复在含害世界 V 38.62→8.73；**如实边界**：对配探测 CMI 的 V 领先 10-seed CI 下界恰为 0（不可显著区分）；
+- **成本合同** $V = \sum\gamma^{t-1}\left[U - \lambda_{\mathrm{tok}}\cdot C_{\mathrm{tok}} - \lambda_{\mathrm{llm}}\cdot C_{\mathrm{llm}} - \lambda_{\mathrm{probe}}\cdot C_{\mathrm{probe}} - \lambda_{\mathrm{lat}}\cdot C_{\mathrm{lat}} - \rho_{\mathrm{harm}}\cdot R_{\mathrm{harm}}\right] - \rho_{\mathrm{ff}}\cdot R_{\mathrm{ff}}$（$\lambda_{\mathrm{llm}}=0$ 如实标注）：SQCAD 默认/风险规避/延迟敏感区间最优（38.48）；对最优非探测基线 break-even $\lambda_{\mathrm{probe}}^*=5.53$（110$\times$ 默认）；探测预算受限（pb=0）领先 CMI +6.6；**保留的负面结果**：强制恢复在含害世界 V 38.62→8.73；**如实边界**：对配探测 CMI 的 V 领先 10-seed CI 下界恰为 0（不可显著区分）；
 - **统计门**：采样单元=seed 的 studentized paired bootstrap（heavy-tail 0.9275 vs 正态 0.8745；D0 世界覆盖–n 斜率反转 0.79→0.92–1.00）；主表差值 CI 不跨 0；四件套 SHA-256 冻结（当前聚合哈希随最新内容重生成）。
 
 ---
@@ -110,14 +110,14 @@
 | 统计与工程门 | ✅ 完成 | `08`（归档）、`bootstrap_ci.py`、`freeze_four_piece.py` | 内容更新后重新生成冻结清单 |
 | 必要性（Lemma A–D + Theorem 4） | ✅ 完成（两点构造版） | `11`、`12`、`necessity_counterexamples.py` | P0 修正 + P1 一般化 |
 | 文献全文级核对 | ✅ 完成 | `10`、D 盘 audit 全文资产 | 审稿点名文献时按同法补核 |
-| **P0 修正**（C6 隔离、IV lifecycle 化、C7/C8 语义） | ✅ 完成（certificate 形式化仍待） | `实验证据链/12` §1–2 | C6 隔离：协议 1.1914 逐位相同、观测对比按 (1−2ε) 稀释；lifecycle IV 误差 0.017 vs 偏倚 12.96 |
-| **P1 一般决策识别定理**（R*(L,U)=U(−L)/(U−L)；安全提交 ⟺ 识别集不跨 0） | ✅ 完成 | `12` 定理文档 §3.6、`实验证据链/12` §3 | **Theorem 5 完整证明** + 计算验证（660 复现 @p*=0.6；决策识别非点识别实例 (500,1650) regret 0） |
-| **P2 拒绝/探测成本边界** | ✅ 完成（数值级） | `实验证据链/12` §4 | C_probe<330 探测胜 commit、<170 胜 defer；与 Gate 4 λ_probe 参数对接仍待 |
-| **P3 动态探索必要性**（Ω(T) 无探索 regret） | ✅ **严格证明完成**（T1(a)，`15`）+ 数值 | `实验证据链/13` §3/§5、`15` | W0–W3 消融：W2 精确 5.85 = τ·p·(T−n_early)/T；无恢复提交规则 5.85 精确（`13` §5）；去审查（W0）后 0.044——现象依赖审查结构 |
-| **P4 动态探索上界 + minimax 探测下界**（恢复 O(1/q) + 探测复杂度） | ✅ **严格证明完成**（T1(b) 上界 `15`；定理 3 检测下界 N* = log(1/δ)/KL、定理 4 后悔分解下界、推论 4 阶匹配，`16`）+ 数值 | `16` §2、`实验证据链/14` §4–5、`reduction_closure.py` | 恢复上界 O(1/(qρ)) 与 T 无关；E[探测数] ≥ N* 全格点成立（绑定 regime 2.2–3.4×，与 q 无关）；E[regret] ≥ L 全格点（r/L ∈ [2.2, 3.4] 绑定 regime）；U/L：τ≤0.5 恢复类严格占优（<1）、τ=1 同阶（2.2–3.6）、强信号 regime U/L ∝ 1/N*（C(δ) 显式涵盖）；主配置 U=800 ≈ 经验 850.2（1.06×） |
+| **P0 修正**（C6 隔离、IV lifecycle 化、C7/C8 语义） | ✅ 完成（certificate 形式化仍待） | `实验证据链/12` §1–2 | C6 隔离：协议 1.1914 逐位相同、观测对比按 $(1-2\varepsilon)$ 稀释；lifecycle IV 误差 0.017 vs 偏倚 12.96 |
+| **P1 一般决策识别定理**（$R^*(L,U)=U(-L)/(U-L)$；安全提交 $\iff$ 识别集不跨 0） | ✅ 完成 | `12` 定理文档 §3.6、`实验证据链/12` §3 | **Theorem 5 完整证明** + 计算验证（660 复现 @p*=0.6；决策识别非点识别实例 (500,1650) regret 0） |
+| **P2 拒绝/探测成本边界** | ✅ 完成（数值级） | `实验证据链/12` §4 | $C_{\mathrm{probe}}<330$ 探测胜 commit、$<170$ 胜 defer；与 Gate 4 $\lambda_{\mathrm{probe}}$ 参数对接仍待 |
+| **P3 动态探索必要性**（$\Omega(T)$ 无探索 regret） | ✅ **严格证明完成**（T1(a)，`15`）+ 数值 | `实验证据链/13` §3/§5、`15` | W0–W3 消融：W2 精确 5.85 = $\tau\cdot p\cdot(T-n_{\mathrm{early}})/T$；无恢复提交规则 5.85 精确（`13` §5）；去审查（W0）后 0.044——现象依赖审查结构 |
+| **P4 动态探索上界 + minimax 探测下界**（恢复 $O(1/q)$ + 探测复杂度） | ✅ **严格证明完成**（T1(b) 上界 `15`；定理 3 检测下界 $N^* = \log(1/\delta)/\operatorname{KL}$、定理 4 后悔分解下界、推论 4 阶匹配，`16`）+ 数值 | `16` §2、`实验证据链/14` §4–5、`reduction_closure.py` | 恢复上界 $O(1/(q\rho))$ 与 $T$ 无关；$\mathbb{E}[\text{探测数}] \ge N^*$ 全格点成立（绑定 regime 2.2–3.4×，与 $q$ 无关）；$\mathbb{E}[\text{regret}] \ge L$ 全格点（$r/L \in [2.2, 3.4]$ 绑定 regime）；$U/L$：$\tau\le 0.5$ 恢复类严格占优（<1）、$\tau=1$ 同阶（2.2–3.6）、强信号 regime $U/L \propto 1/N^*$（$C(\delta)$ 显式涵盖）；主配置 $U=800$ $\approx$ 经验 850.2（1.06$\times$） |
 | **self-obscuring 结构消融 + self-confirming 全对比（T1/T2 机制证据链，实验 A/B）** | ✅ 完成（严格证明 + 12-seed 数值） | `实验证据链/13`、`15`、`self_obscuring_ablation.py`（15 项新测试） | 主张升级判定（14- §9：验收 1/2 严格满足、3 部分满足）→ 推进 SQCAD 框架设计 |
 | **reduction controls（实验 B，14- §7.2）** | ✅ 完成 | `实验证据链/13` §4 | T2 反证的数值侧；W0/W1 有效、W2 精确线性 |
-| **T2 严格化 + P4 minimax 下界（评审回应批）** | ✅ 完成（严格证明 + 数值佐证） | `16`、`实验证据链/14`、`reduction_closure.py`（16 项新测试）、`self_obscuring_ablation.py`（random_flip/oracle 控制） | 配对恒等式任意策略逐位精确；忠实像上 Θ(T)；禁止 φ 控制成功；N* 下界与后悔分解全格点成立；阶匹配（绑定 regime 常数因子） |
+| **T2 严格化 + P4 minimax 下界（评审回应批）** | ✅ 完成（严格证明 + 数值佐证） | `16`、`实验证据链/14`、`reduction_closure.py`（16 项新测试）、`self_obscuring_ablation.py`（random_flip/oracle 控制） | 配对恒等式任意策略逐位精确；忠实像上 $\Theta(T)$；禁止 $\phi$ 控制成功；$N^*$ 下界与后悔分解全格点成立；阶匹配（绑定 regime 常数因子） |
 | 外部 rollout（chronological future） | ⏸ 阻塞（模型端点） | `00 实验证据链` 未验证清单 | — |
 | 公开数据集客观治理比较 | ⏳ 方案已定、实施未完成 | `17-SQCAD公开数据集落地与框架实验方案-20260813.md` | LongMemEval-S 主集 + LoCoMo 复验；统一合同、同一 reader/evaluator、无手工金标依赖 |
 | **公开数据集落地准备批（本批）** | ✅ 完成 | `18-基线开源状态与无GPU复现审计-20260813.md`、`docs/自用/03-实验证据链/15-基线开源状态与无GPU复现审计-20260813.md`、`tools/render_framework_diagram.py` | ①核心源码冻结（255 测试通过 + 四件套清单重生成，聚合 `badbb886…`，code 46/results 25/reports 11）；②框架工程图 13-（Evidence→Qualification→Access→Decision→Lifecycle，含 T1/T2/P4 之后的 censoring-aware 语义与 restore/probe 通道，渲染脚本入仓库）；③GitHub 展示层组建（README 重写、docs_en 更新、CITATION.cff）；④12 个 R3 基线 + 4 个基准数据集逐一网络核查（结论：仅 ActMem 真 GPU 阻塞；其余 API-key 阻塞或纯 CPU；Oblivion 代码公开但 NEC 专有许可；FadeMem/Memory Worth/DeMem/Trivium/GovMem 无官方代码；LoCoMo 官方 F1 无 judge LLM 可纯 CPU 评分） | 按 17 §5 先做 D1/D2 检索协议（可全 CPU）与 LoCoMo 离线 F1；Oblivion/SimpleMem 非 LLM 机器离线验收 |
@@ -139,7 +139,7 @@
 1. **主张升级判定已更新**（本批）：验收条件 1（T1 依赖审查结构、去结构失效）、2（T2 reduction separation）严格满足，3 **现已全部严格满足**（T1(b) 上界严格 + 定理 3/4 探测 minimax 下界严格，`16`；数值佐证 `实验证据链/14`）——"三项中两项"最低条件已远超；据此推进 SQCAD 框架设计（Evidence/Qualification 层的 censoring-aware 语义、restore channel 的 cost-aware 决策——`13` 报告 §5 的 cost_aware 规则数值验证已在框架方向内）；
 2. **P4 已完成**（本批：定理 3 检测下界 + 定理 4 后悔分解 + 推论 4 阶匹配，`16` §2；数值 `实验证据链/14` §4–5）；T2 已完成（`16` §1；`15` §3 升级标注）；
 3. P0 遗留：authorization certificate 形式化（soundness/verifiability/non-triviality）与 Theorem 4(c′) 收紧；该遗留不阻塞公开数据集客观治理比较，但限制“完整授权理论”的表述。
-4. P2 对接成本合同：C_probe ← Gate 4 的 λ_probe·E[probes] 估计，重算边界表；
+4. P2 对接成本合同：$C_{\mathrm{probe}} \leftarrow$ Gate 4 的 $\lambda_{\mathrm{probe}}\cdot\mathbb{E}[\text{probes}]$ 估计，重算边界表；
 5. 长线下游（最近的现实接地增量）：**trace-grounded chronological 实验**（验收 6/7：时间先后 + 因果优先于观察依赖，无模型端点可做）、外部 rollout、声称压缩（最后做）；
 6. 公开数据集落地时先完成客观性 gate：冻结 candidate stream、future split、reader/evaluator、成本合同和基线版本；人工标注仅作盲法机制审计，不能替代客观主表；
 7. 每批补充后：全量测试 → 重新生成四件套冻结清单 → 同步 D 盘 → 提交推送。

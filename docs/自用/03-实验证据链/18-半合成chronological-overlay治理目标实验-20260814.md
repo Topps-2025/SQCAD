@@ -2,7 +2,7 @@
 
 > 目标阶段 3（由 `16-` §4 判定触发）：公开数据无 lifecycle 金标，因此在 LoCoMo 纵向轨迹上注入**程序化生成**的未来事件（只使用历史时点可见信息），以程序化客观标签直接检验 T1/T2 理论预测的治理指标——false forgetting、有害保留、纠错吸收、probe/restore 救援。
 >
-> 方案：`草稿-draft/实验方案与基线/19-`。代码：`src/sqcad/chronological_overlay.py` + `tests/test_chronological_overlay.py`（7 项）。结果：`results/chronological_overlay.json`。复用 `16-` 冻结的统一合同与显著性管线（paired studentized bootstrap，n_boot=2000，boot_seed=20260812；n=10 会话单位）。
+> 方案：`草稿-draft/实验方案与基线/19-`。代码：`src/sqcad/chronological_overlay.py` + `tests/test_chronological_overlay.py`（7 项）。结果：`results/chronological_overlay.json`。复用 `16-` 冻结的统一合同与显著性管线（paired studentized bootstrap，$n_{\mathrm{boot}}=2000$，boot_seed=20260812；n=10 会话单位）。
 
 ## 1. 预注册注入协议（冻结于运行之前）
 
@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | E1_GAP | 2 | E1 版本更新干扰 | needed turn 首句 + "UPDATE: this is the newer version"，置于 anchor+2 | 原 QA 金标不变；暴露旧版=命中，暴露更新且缺证据=distractor |
 | E2_GAP | 1 | E2 纠错事件 | anchor+1 注入否定金标的错误事实 F（"…this was NOT <gold>"）；anchor+2 注入 "Correction: <gold>" | 纠错后暴露 F 且缺证据=harmful；纠错提供吸收机会（对照 E3） |
-| E2_GAP | 1 | E3 有害保留 | 仅注入 F（无纠错） | 同上 harmful；F 与证据共享 ≥3 词（版本冲突可检测） |
+| E2_GAP | 1 | E3 有害保留 | 仅注入 F（无纠错） | 同上 harmful；F 与证据共享 $\ge 3$ 词（版本冲突可检测） |
 | — | — | E4 稀有正向保护 | 无注入（低频 session 的 needed turn，稀有度按原始流计算） | 原 QA |
 | — | — | E5 self-obscuring+救援 | 无注入（写时被归档的证据在 QA 时可否被 probe/restore/fallback 救回） | 救回=rescue，未救回=false forgetting |
 | N_EVENTS_PER_TRACE | 5 | 每会话每类注入 ≤5 个事件（轮转分配，每 QA 至多 1 个 E1/E2/E3 事件） | OVERLAY_SEED | 20260814 |
@@ -31,7 +31,7 @@
 | **no_fallback** | 0.220 | **0.960** | **0.860** | 0.178 | 0.199 | 0.800 |
 | no_positive_protection | 0.220 | 0.300 | 0.420 | 0.171 | 0.206 | 0.793 |
 
-注：harmful 判据要求"F 暴露 ∧ 证据缺失"——recency/keep_all 的 harmful≈0 是结构性零（recency 几乎什么都不暴露；keep_all 什么都暴露），解读时须与 hit 联读。
+注：harmful 判据要求"F 暴露 ∧ 证据缺失"——recency/keep_all 的 harmful$\approx 0$ 是结构性零（recency 几乎什么都不暴露；keep_all 什么都暴露），解读时须与 hit 联读。
 
 ## 3. 显著性判定（预注册规则；n=10 会话，studentized paired bootstrap）
 

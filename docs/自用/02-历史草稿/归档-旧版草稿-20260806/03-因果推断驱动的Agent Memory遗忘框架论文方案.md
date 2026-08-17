@@ -322,7 +322,7 @@ periodically:
 | 阶段 | 实现范围 | 通过条件 |
 | --- | --- | --- |
 | P0：日志底座 | event/memory/factor/rule schema、候选、暴露、propensity、结果和状态迁移 | 任一决策可由 `decision_id` 与证据谱系全链路回放。 |
-| P1：解构可用性 | 因子抽取、关系模板、证据定位、规则候选与200包分层人工审计 | 在 [[experiments/semantic_gate_a/LongMemEval语义解构Gate-A标注规范|Gate A]] 上，bootstrap 95%下界达到 Factor micro-F1≥0.80、Relation F1≥0.70、provenance coverage≥0.95、scope completeness≥0.90；错误率用95%上界≤0.10；不以 LLM 自述替代审计。 |
+| P1：解构可用性 | 因子抽取、关系模板、证据定位、规则候选与200包分层人工审计 | 在 [[experiments/semantic_gate_a/LongMemEval语义解构Gate-A标注规范|Gate A]] 上，bootstrap 95%下界达到 Factor micro-F1 $\ge$ 0.80、Relation F1 $\ge$ 0.70、provenance coverage $\ge$ 0.95、scope completeness $\ge$ 0.90；错误率用95%上界 $\le$ 0.10；不以 LLM 自述替代审计。 |
 | P2：可控干预 | 六类 simulator、因子束/簇级遮蔽、规则—证据对照、静态估计器 | 在真值数据上复现已知 ATE/CATE 方向，并能区分表面因素与有效条件。 |
 | P3：序贯估计 | MSM、sequential DR/OPE、策略部署回测 | OPE 能在模拟器上正确排序目标策略。 |
 | P4：公开基准 | LongMemEval、GoodAI-LTM、LoCoMo | 固定底座下完成简单规则与强基线公平比较。 |
@@ -372,7 +372,7 @@ periodically:
 | 组别 | 方法 | 必要性 |
 | --- | --- | --- |
 | 下界/上界 | No-memory、Full context、Oracle evidence、固定滑窗 | 判断记忆本身、候选上限和上下文容量影响。 |
-| 简单治理 | FIFO、LRU、Recency、Frequency、Recency×Frequency | 验证复杂治理是否超越廉价规则。 |
+| 简单治理 | FIFO、LRU、Recency、Frequency、Recency$\times$Frequency | 验证复杂治理是否超越廉价规则。 |
 | 固定检索 | BM25、dense cosine、dev-tuned RRF hybrid，统一 top-k | 排除检索器差异；LongMemEval-S 上 RRF 已作为多证据覆盖较强的检索对照。 |
 | 常用系统 | Mem0；一个分层/摘要型系统；A-MEM（可复现时） | 比较事实 CRUD、摘要/分层与关联组织。 |
 | 直接遗忘 | FadeMem、Oblivion | 时间/频率/相关性衰减与可恢复访问控制。 |
@@ -430,7 +430,7 @@ periodically:
 | E3 异质、抽象与漂移 | 条件规则是否可跨表面变换而不跨作用域外推 | low-frequency/shift 场景 | global ATE、CATE、稳定性约束、无作用域抽象 | rare-critical、OOD 与规则校准改善。 |
 | E4 风险状态机 | 可恢复与非对称损失是否必要 | drift/reversal/scope 场景 | 对称阈值、硬删除、拟议状态机 | 更低错误遗忘和更高恢复成功。 |
 | E5 公开主结果 | 是否改善真实任务效用—成本 | LongMemEval、GoodAI-LTM、LoCoMo | 简单规则、FadeMem、Oblivion、Memory Worth、DeMem | 至少一个公开集上改善公平协议下的帕累托前沿。 |
-| E6 归因控制 | 收益是否来自表示/治理而非检索 | 表示×检索小型交叉矩阵 | BM25/dense/hybrid、固定 top-k | 因子/规则与治理收益在合理检索设置中方向稳定。 |
+| E6 归因控制 | 收益是否来自表示/治理而非检索 | 表示$\times$检索小型交叉矩阵 | BM25/dense/hybrid、固定 top-k | 因子/规则与治理收益在合理检索设置中方向稳定。 |
 | E7 扩展复验 | 是否跨记忆能力面成立 | MemBench/MemoryAgentBench | 可运行强基线 | 作为外部复验，不替代主结果。 |
 
 当前已完成的前置校准：E0 的表示层最小模拟见 [[experiments/解构抽象最小模拟实验报告|解构—抽象最小模拟实验报告]]；静态混杂校正见 [[experiments/因果估计器最小校准实验报告|因果估计器最小校准实验报告]]。二者只能证明局部必要条件，不能替代 E2 的长 horizon 序贯验证或 E5 的公开 benchmark 复现。

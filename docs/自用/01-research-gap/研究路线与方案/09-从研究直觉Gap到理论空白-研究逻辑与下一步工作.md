@@ -33,8 +33,8 @@
 > 现有工作可能都没有直接估计"改变既有记忆的持久访问状态后，对未来生命周期轨迹的累计因果价值"。
 >
 > 具体而言：
-> - 历史关联价值 ≠ 持久访问干预的生命周期价值；
-> - query-local intervention effect ≠ 持久访问干预的生命周期价值；
+> - 历史关联价值 $\ne$ 持久访问干预的生命周期价值；
+> - query-local intervention effect $\ne$ 持久访问干预的生命周期价值；
 > - 通用序贯因果工具存在，但尚未针对 memory-specific persistent-access treatment 构造给出可操作协议。
 
 **这个假设的独特交叉点**由四个要素共同定义：
@@ -183,14 +183,14 @@ CMI 已覆盖固定 query 下的局部干预，Trivium 已覆盖一般序贯因�
 
 ### 2.1 作用域
 
-作用域 (s) 不是一个模糊标签，而应至少包含：
+作用域 $(s)$ 不是一个模糊标签，而应至少包含：
 
 ```text
 s = (task distribution, user/principal, tool set, model/version,
      risk regime, reader, evaluator, memory budget, target policy)
 ```
 
-source scope (s) 表示形成 qualification 的历史环境；target scope (s^*) 表示要部署或评估的未来环境。若模型版本、工具或 evaluator 发生改变，必须明确它们属于 scope shift，而不能继续使用同一个平均效应。
+source scope $(s)$ 表示形成 qualification 的历史环境；target scope $(s^*)$ 表示要部署或评估的未来环境。若模型版本、工具或 evaluator 发生改变，必须明确它们属于 scope shift，而不能继续使用同一个平均效应。
 
 ### 2.2 处理单元与状态
 
@@ -200,7 +200,7 @@ source scope (s) 表示形成 qualification 的历史环境；target scope (s^*)
 - evidence-anchored relation；
 - memory 的 persistent access state。
 
-SQCAD 的理论对象应优先选择"记忆 (i) 的持久访问状态"，因为只有这样才能表达 protect、downweight、isolate、archive 和 restore 对未来 candidate stream 的影响。raw memory 是证据载体，relation belief 是派生信念，二者不能直接代替 treatment。
+SQCAD 的理论对象应优先选择"记忆 $(i)$ 的持久访问状态"，因为只有这样才能表达 protect、downweight、isolate、archive 和 restore 对未来 candidate stream 的影响。raw memory 是证据载体，relation belief 是派生信念，二者不能直接代替 treatment。
 
 ### 2.3 持久访问 treatment
 
@@ -226,7 +226,7 @@ $$
 
 ### 2.4 生命周期价值
 
-在作用域 (s)、目标策略 $\pi$、时间窗口 (H) 和折扣因子 $\gamma$ 下，定义：
+在作用域 $(s)$、目标策略 $\pi$、时间窗口 $(H)$ 和折扣因子 $\gamma$ 下，定义：
 
 $$
 V_s^\pi(a)
@@ -365,7 +365,7 @@ $$
 
 ### 3.4 多记忆竞争不能默认可加
 
-在固定 workspace budget 下，提高记忆 (i) 的访问质量会降低其他候选的访问质量。于是：
+在固定 workspace budget 下，提高记忆 $(i)$ 的访问质量会降低其他候选的访问质量。于是：
 
 $$
 V(a_i=1,a_j=1)-V(a_i=0,a_j=0)
@@ -739,7 +739,7 @@ source period 只形成 qualification；冻结规则后进入 chronological futu
 
 - [x] 第 1 步：固定最小状态变量和 notation（已在 `gap_proof_experiments.py` 中完成）
 - [x] 第 2–3 步：构造三个命题的反例（命题 A/B/C 全部通过，20/20 seeds 稳定）
-- [x] 第 4 步：决策 regret 反例（所有 regret > 0）
+- [x] 第 4 步：决策 regret 反例（所有 $\operatorname{regret} > 0$）
 - [x] 第 5 步：从反例提取识别条件（9 条，见 `IDENTIFICATION_CONDITIONS`）
 - [x] 第 6 步（部分）：识别条件 → 框架设计的推导链（见 `10-识别条件到框架设计的形式化推导.md`）
 

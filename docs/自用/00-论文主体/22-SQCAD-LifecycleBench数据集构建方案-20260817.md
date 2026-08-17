@@ -8,7 +8,7 @@ LongMemEval-S 与 LoCoMo 继续承担公开外部验证：候选覆盖、证据�
 
 ## 2. 目标对象
 
-对记忆 i、scope s，比较 tau(i,s) = V_s^pi(keep_i) - V_s^pi(archive_i)。其中 V_s^pi(a) 是从持久动作决策点开始，到预注册 horizon 结束的折扣效用、风险和访问成本总和。keep/archive 必须改变未来候选生成、曝光机会、workspace 竞争和恢复路径；若只改变当前 QA 的 top-k，仍只是 retrieval benchmark。
+对记忆 $i$、scope $s$，比较 $\tau(i,s) = V_s^\pi(\operatorname{keep}_i) - V_s^\pi(\operatorname{archive}_i)$。其中 $V_s^\pi(a)$ 是从持久动作决策点开始，到预注册 horizon 结束的折扣效用、风险和访问成本总和。keep/archive 必须改变未来候选生成、曝光机会、workspace 竞争和恢复路径；若只改变当前 QA 的 top-k，仍只是 retrieval benchmark。
 
 ## 3. 数据合同：六个必备特征
 
@@ -51,7 +51,7 @@ Hidden Counterfactual Layer 由 evaluator 独占 keep/archive 分支、潜在结
 1. **Scenario Designer** 生成冻结的结构化模板：实体、旧/新事实、scope、风险类型、未来事件槽位和依赖图；不生成 oracle outcome。
 2. **Trace Realizer** 将模板变为多 session 自然对话、任务、工具调用和纠错；允许同义表达、指代、多跳、无关高频信息及 hitchhiker，但必须通过 schema 校验：不得泄露未来或改写冻结事实。
 3. World Simulator 维护 user、task、memory、tool、risk 和 candidate-generator 状态；在决策点复制状态，使用相同未来事件和随机数运行 paired rollout。事实依赖、风险、候选变化和任务成功由可审计规则决定；LLM 只负责文本表面。
-4. Independent Evaluator 读取隐藏世界、分支结果和 policy log，计算 tau、false commit、lifecycle regret、harmful exposure、rescue 与总成本。
+4. Independent Evaluator 读取隐藏世界、分支结果和 policy log，计算 $\tau$、false commit、lifecycle regret、harmful exposure、rescue 与总成本。
 
 ## 6. 首版场景族
 

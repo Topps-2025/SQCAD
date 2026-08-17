@@ -13,7 +13,7 @@
 
 **Open:**
 
-- [ ] Complete R6 human anchoring (28 blinded cases; Cohen's κ ≥ 0.6) and archive judge packets.
+- [ ] Complete R6 human anchoring (28 blinded cases; Cohen's $\kappa \ge 0.6$) and archive judge packets.
 - [ ] Run Phase B end-to-end (frozen reader/LLM/tools; only persistent state switches) — first validation of scope lookahead.
 - [ ] Reproduce named governance baselines under the unified contract (agent vs official columns); report `not reproduced` where unavailable.
 - [ ] Release the R7 public package (anonymized `public_trace_only.jsonl` + official scorer) and verify licenses before redistribution.

@@ -72,9 +72,7 @@ SAGE 将新抽取事实路由为 ADD、NOOP 或与既有条目合并，并以随
 
 给定显式记忆状态 $M$、任务条件 $c$ 与候选动作 $a\in\{\text{保留},\text{降权},\text{归档},\text{逻辑弃用}\}$，可将自由能定义为行动损失、观察解释残差、语义表征复杂度、时间/作用域失配与资源成本的联合目标：
 
-```text
-a* = argmin_a F(M_a | c, parameterized semantic prior, explicit evidence)
-```
+$$a^* = \arg\min_a F\big(M_a \mid c,\ \text{parameterized semantic prior},\ \text{explicit evidence}\big)$$
 
 实现上，冻结 LLM 在时间与主体条件下将条目映射为语义表示；`available_at`、`valid_from/to` 与来源字段约束参数化先验不得替代历史证据。在线估计器可用时间、频率、相关性、预测误差和可靠性近似各动作的自由能变化，但这些特征不再单独承担生命周期决策。对于低频—高后果记忆，灾难性失败风险、条件稀有性、来源可靠性与潜在再激活需求均进入动作后的自由能代价，使低激活不自动等价于低保护优先级。
 
@@ -88,10 +86,7 @@ a* = argmin_a F(M_a | c, parameterized semantic prior, explicit evidence)
 
 将每条外显记忆表示为带元数据的模式 $\xi_i$，将当前任务编码为查询状态 $q_c$，并比较候选动作后记忆库 $M_a$ 的联合目标：
 
-```text
-a* = argmin_a E_{q ~ D(c)}[ E_H(q, M_a) + λL_action(q, M_a)
-                             + γL_scope(q, M_a) + ρCost(M_a) ]
-```
+$$a^* = \arg\min_a \mathbb{E}_{q \sim D(c)}\big[ E_H(q, M_a) + \lambda L_{\text{action}}(q, M_a) + \gamma L_{\text{scope}}(q, M_a) + \rho\,\mathrm{Cost}(M_a) \big]$$
 
 其中 $E_H$ 是 Hopfield/EBM 联想能量，$L_{action}$ 衡量行动损失，$L_{scope}$ 约束时间、主体、权限与撤回条件。关键不在于“删除高能模式”，而在于比较不同状态动作对查询吸引子、任务损失和作用域风险的联合影响。高能模式既可能是弱整合噪声，也可能是罕见而关键的例外；因此可将低频—高后果记忆设为具有较高误衰减代价和较低再激活阈值的评测条件。能量用于安排衰减、归档、再激活或回放的优先级，而非充当脱离证据的物理删除规则。
 

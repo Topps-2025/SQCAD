@@ -203,12 +203,12 @@ Query-required gold 用于检验表示是否保持任务充分性，而不是训
 
 | 指标 | Gate A 门槛 |
 | --- | ---: |
-| Factor micro-F1 | ≥0.80 |
-| Relation F1 | ≥0.70 |
-| Provenance coverage | ≥0.95 |
-| Scope completeness | ≥0.90 |
-| Negation/temporal/update error rate | ≤0.10 |
-| Rule overgeneralization rate | ≤0.10 |
+| Factor micro-F1 | $\ge$ 0.80 |
+| Relation F1 | $\ge$ 0.70 |
+| Provenance coverage | $\ge$ 0.95 |
+| Scope completeness | $\ge$ 0.90 |
+| Negation/temporal/update error rate | $\le$ 0.10 |
+| Rule overgeneralization rate | $\le$ 0.10 |
 
 门槛应在查看全量 benchmark 结果前冻结，不能为保留某个模型而事后降低。若真实解构器未通过 Gate A，则停止全量规则抽象，退回 Raw evidence 或证据级治理。
 
@@ -217,9 +217,9 @@ Query-required gold 用于检验表示是否保持任务充分性，而不是训
 [[score_semantic_gate_a.py]] 将上述门槛转化为确定性评分：
 
 - Evidence span 以同一 session/turn 中的原文 token 位置计算 precision、recall 和 F1；
-- Factor 匹配要求类型相同、normalized token Jaccard≥0.5且来源跨度有非零重叠，再按词项与 provenance 加权得分进行一对一贪心匹配；
+- Factor 匹配要求类型相同、normalized token Jaccard $\ge$ 0.5且来源跨度有非零重叠，再按词项与 provenance 加权得分进行一对一贪心匹配；
 - Relation 匹配要求 relation type 及经 Factor 映射后的 source/target 集合一致；
-- provenance coverage 要求匹配单元的来源 token-F1≥0.8；
+- provenance coverage 要求匹配单元的来源 token-F1 $\ge$ 0.8；
 - scope completeness 只统计 gold 中明确要求的 subject/task/time 字段；
 - 漏掉的否定、时间或 update 单元计为错误，避免通过完全不预测来获得低错误率；
 - 以 packet 为 bootstrap 单位重复1,000次。对于“越大越好”指标使用95%区间下界判定，对于错误率使用区间上界判定，而不是只看点估计。

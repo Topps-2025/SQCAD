@@ -53,7 +53,7 @@ tags:
 
 相对 Raw BM25 的逐 split 配对差如下：
 
-| 指标 | Δ Raw + relation RRF | 95% CI 半宽 |
+| 指标 | $\Delta$ Raw + relation RRF | 95% CI 半宽 |
 | --- | ---: | ---: |
 | Recall-any@1 | −0.0717 | ±0.0222 |
 | Recall-all@5 | +0.0021 | ±0.0020 |

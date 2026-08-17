@@ -691,7 +691,7 @@ $$
 本节假设两个剩余理论结果已经完成：
 
 - **T2 严格 reduction separation**：在保持即时 reward、动作语义和反馈语义的限制下，普通 bandit/OPE 若不显式增加 evidence-availability、lineage 或 restore state，就不能忠实表示 archive-induced evidence censoring；
-- **P4 严格 minimax 探测下界**：在相同 self-obscuring 模型类和相同成本合同下，任何策略为了以置信度 (1-delta) 区分相反最优动作世界，都必须支付至少某个 KL/信息量决定的探测成本；T1(b) 的 restore 策略达到同阶上界。
+- **P4 严格 minimax 探测下界**：在相同 self-obscuring 模型类和相同成本合同下，任何策略为了以置信度 $(1-\delta)$ 区分相反最优动作世界，都必须支付至少某个 $\operatorname{KL}$/信息量决定的探测成本；T1(b) 的 restore 策略达到同阶上界。
 
 在这个假设下，整篇论文可以按下面的顺序组织。
 
@@ -832,9 +832,9 @@ $$
 
 若：
 
-- (L>0)，可以安全 keep；
-- (U<0)，可以安全 archive；
-- (L\le0\le U)，不同相容世界支持不同动作。
+- $(L>0)$，可以安全 keep；
+- $(U<0)$，可以安全 archive；
+- $(L\le 0 \le U)$，不同相容世界支持不同动作。
 
 跨零时，任何直接 commit 的规则都有：
 
@@ -883,7 +883,7 @@ $$
 
 #### T1(b)：有恢复时的上界
 
-若每步以概率 (q>0) restore/probe，且恢复证据以概率 $\rho$ 越过识别阈值，则：
+若每步以概率 $(q>0)$ restore/probe，且恢复证据以概率 $\rho$ 越过识别阈值，则：
 
 $$
 \mathbb E[R_T]
@@ -892,7 +892,7 @@ O\left(\frac{1}{q\rho}\right)+\text{恢复成本},
 
 $$
 
-与 (T) 无关。
+与 $(T)$ 无关。
 
 通俗地说：恢复不是免费，但只要永远保留一条重新检查的通道，错误不会无限期积累。
 
@@ -934,7 +934,7 @@ $$
 
 ### 16.8 第八步：P4 严格证明探测成本是不可避免的
 
-假设 P4 完成严格 minimax 下界。为了以置信度 (1-delta) 区分 K/A 两个相反最优动作世界，任何策略至少需要：
+假设 P4 完成严格 minimax 下界。为了以置信度 $(1-\delta)$ 区分 K/A 两个相反最优动作世界，任何策略至少需要：
 
 $$
 N_{\mathrm{probe}}
