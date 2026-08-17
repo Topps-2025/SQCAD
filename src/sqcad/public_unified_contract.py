@@ -305,8 +305,11 @@ def _version_map(msgs: Sequence[TraceMsg], overlap: int = CONFLICT_OVERLAP
             for j in postings[t]:
                 if j > i:
                     counts[j] += 1
-        for j, c in counts.items():
-            if c >= overlap and msgs[j].session_id != m.session_id:
+        # Deterministic order (j descending): `newest` is the LATEST
+        # updater, and the updaters list does not depend on the hash-order
+        # of `set(m.tokens)` (PYTHONHASHSEED), so runs are reproducible.
+        for j in sorted(counts, reverse=True):
+            if counts[j] >= overlap and msgs[j].session_id != m.session_id:
                 updaters[m.msg_id].append(msgs[j].msg_id)
                 newest[m.msg_id] = msgs[j].msg_id
     return updaters, newest

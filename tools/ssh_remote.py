@@ -16,9 +16,9 @@ import sys
 
 import paramiko
 
-HOST = "connect.westc.seetacloud.com"
-PORT = 54834
-USER = "root"
+HOST = os.environ.get("SQCAD_AUTODL_HOST", "connect.weste.seetacloud.com")
+PORT = int(os.environ.get("SQCAD_AUTODL_PORT", "48222"))
+USER = os.environ.get("SQCAD_AUTODL_USER", "root")
 
 
 def _password() -> str:

@@ -34,21 +34,23 @@ from src.sqcad.trace_grounded_runner import (
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 BATCH = 64
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def embed(texts, tokenizer, model) -> torch.Tensor:
-    """Mean-pooled, L2-normalized MiniLM embeddings (CPU)."""
+    """Mean-pooled, L2-normalized MiniLM embeddings (CUDA when available)."""
     out = []
     for i in range(0, len(texts), BATCH):
         batch = texts[i:i + BATCH]
         enc = tokenizer(batch, padding=True, truncation=True,
                         max_length=256, return_tensors="pt")
+        enc = {k: v.to(DEVICE) for k, v in enc.items()}
         with torch.no_grad():
             hidden = model(**enc).last_hidden_state
             mask = enc["attention_mask"].unsqueeze(-1).float()
             pooled = (hidden * mask).sum(1) / mask.sum(1).clamp(min=1e-9)
             pooled = torch.nn.functional.normalize(pooled, dim=1)
-        out.append(pooled)
+        out.append(pooled.cpu())
     return torch.cat(out, dim=0)
 
 
@@ -69,6 +71,7 @@ def main() -> None:
     from transformers import AutoModel, AutoTokenizer  # venv-only dep
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     model = AutoModel.from_pretrained(MODEL_NAME)
+    model.to(DEVICE)
     model.eval()
 
     traces = (load_longmemeval_s(args.data)
@@ -87,13 +90,12 @@ def main() -> None:
         msg_vecs = {msgs[i].msg_id: vecs[i].tolist() for i in range(len(msgs))}
         q_vecs = [vecs[len(msgs) + i] for i in range(len(tasks))]
 
-        def cos(a, b):
-            return sum(x * y for x, y in zip(a, b))
-
+        msg_mat = torch.tensor(list(msg_vecs.values()), dtype=torch.float32)
         out: dict = {}
         for t, qv in zip(tasks, q_vecs):
-            ranked = sorted(msg_vecs.items(),
-                            key=lambda kv: (-cos(kv[1], qv), kv[0]))
+            scores = (msg_mat @ torch.tensor(qv, dtype=torch.float32)).tolist()
+            ranked = sorted(zip(msg_vecs.keys(), scores),
+                            key=lambda kv: (-kv[1], kv[0]))
             out[t.task_id] = [mid for mid, _ in ranked[:BUDGET]]
         cache[trace.sample_id] = out
         n_texts += len(texts)
