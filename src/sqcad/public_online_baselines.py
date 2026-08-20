@@ -21,6 +21,27 @@ after the decision.  New policy names are added alongside the frozen rows
                          QAs only (support failure -> base score, the same
                          documented proxy fallback); retained(t) = top-BUDGET
                          by effect at t-1.
+  demem_online        -- DeMem proxy (preserve distinctions that change
+                         downstream decisions): |posterior - mean posterior|
+                         over PRIOR QAs (deviation from the average
+                         behaviour), retained(t) = top-BUDGET by deviation
+                         at t-1.
+  trivium_online      -- Trivium proxy (triple memory: episodic demand x
+                         semantic prior; the L2 trace task has no
+                         required-group field, so episodic demand is the
+                         number of PRIOR QAs whose query hit the message):
+                         score = (1 + prior hits) x base score.
+  govmem_online       -- GovMem proxy (budget-constrained governance,
+                         evict what minimises expected future loss): keep
+                         the messages that maximally cover PRIOR QAs,
+                         score = prior hits (tie-break base score).
+
+The transductive batch-score references (demem / trivium / govmem) are
+computed in this file as well (full-QA counters -> one shared top-BUDGET
+retention set), matching the frozen memory_worth/causal_item convention
+(public_unified_contract.py:472-478, :792-810) without touching the frozen
+file; the online-vs-transductive gap is the future-query-leakage bound
+(33-: 31- sec. 5.4).
 
 Cold-start semantics: on LongMemEval-S (exactly 1 task per sample) the
 priors at t-1 are the uninformative (0,0) counters, so the row reports the
@@ -53,8 +74,10 @@ from .public_unified_contract import (
 )
 from .trace_grounded_runner import Trace, TraceMsg, TraceTask
 
-ONLINE_POLICIES = ("memory_worth_online", "causal_item_online")
-COMPARE_POLICIES = ("memory_worth", "causal_item", "bm25", "sqcad")
+ONLINE_POLICIES = ("memory_worth_online", "causal_item_online",
+                   "demem_online", "trivium_online", "govmem_online")
+COMPARE_POLICIES = ("memory_worth", "causal_item", "demem", "trivium",
+                    "govmem", "bm25", "sqcad")
 
 
 # ---------------------------------------------------------------------------
@@ -67,21 +90,51 @@ def _posterior_mean(counters: Dict[str, Tuple[int, int]]) -> Dict[str, float]:
             for mid, (h, n) in counters.items()}
 
 
+def _posterior_deviation(
+        counters: Dict[str, Tuple[int, int]]) -> Dict[str, float]:
+    """DeMem proxy signal: deviation from the mean posterior (preserve
+    distinctions that change downstream decisions)."""
+    post = _posterior_mean(counters)
+    mu = statistics.mean(post.values()) if post else 0.0
+    return {mid: abs(p - mu) for mid, p in post.items()}
+
+
+def _episodic_demand(
+        counters: Dict[str, Tuple[int, int]],
+        base: Dict[str, float]) -> Dict[str, float]:
+    """Trivium proxy signal: episodic demand (prior hits) x semantic
+    prior (base score)."""
+    return {mid: (1.0 + counters[mid][0]) * base.get(mid, 0.0)
+            for mid in counters}
+
+
+def _coverage_loss(
+        counters: Dict[str, Tuple[int, int]],
+        base: Dict[str, float]) -> Dict[str, float]:
+    """GovMem proxy signal: keep what maximally covers prior QAs
+    (eviction minimises expected future loss); tie-break by base score."""
+    return {mid: counters[mid][0] + 1e-6 * base.get(mid, 0.0)
+            for mid in counters}
+
+
 def _online_ratio_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
                          policy: str,
-                         posterior: Callable[[Dict[str, Tuple[int, int]]],
-                                             Dict[str, float]]
+                         score: Callable[[Dict[str, Tuple[int, int]],
+                                          Dict[str, float]],
+                                         Dict[str, float]]
                          ) -> PolicyResult:
-    """memory_worth_online: retention for task t uses only QA evidence from
-    tasks strictly before t (frozen QA order)."""
+    """Generic strict-online engine: retention for task t uses only QA
+    evidence from tasks strictly before t (frozen QA order), scored by the
+    injected signal; task t's query is consumed after its decision."""
     toks = {m.msg_id: set(m.tokens) for m in msgs}
+    base = _base_scores(msgs)
     counters: Dict[str, Tuple[int, int]] = {m.msg_id: (0, 0) for m in msgs}
     out: Dict[str, Tuple[str, ...]] = {}
     lifecycle = {"archives": 0, "restores": 0, "probes": 0, "fallbacks": 0}
     retained: Tuple[str, ...] = ()
     for t in tasks:
-        scores = posterior(counters)
-        ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
+        sc = score(counters, base)
+        ranked = sorted(sc.items(), key=lambda kv: (-kv[1], kv[0]))
         new_retained = tuple(mid for mid, _ in ranked[:BUDGET])
         for mid in new_retained:
             if mid not in retained:
@@ -97,6 +150,35 @@ def _online_ratio_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
             hit = int(len(toks[m.msg_id] & q) >= CONFLICT_OVERLAP)
             h, n = counters[m.msg_id]
             counters[m.msg_id] = (h + hit, n + (1 - hit))
+    return PolicyResult(
+        policy=policy, workspaces=out, storage_ids=retained,
+        storage_tokens=_storage_tokens(msgs, retained), lifecycle=lifecycle)
+
+
+def _batch_score_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
+                        policy: str,
+                        score: Callable[[Dict[str, Tuple[int, int]],
+                                         Dict[str, float]],
+                                        Dict[str, float]]
+                        ) -> PolicyResult:
+    """Transductive reference for the proxy family (33- convention, frozen
+    file untouched): one pass over the FULL QA sequence accumulates the
+    counters, one static top-BUDGET retention set is shared by every task
+    (the frozen memory_worth/causal_item structure)."""
+    toks = {m.msg_id: set(m.tokens) for m in msgs}
+    base = _base_scores(msgs)
+    counters: Dict[str, Tuple[int, int]] = {m.msg_id: (0, 0) for m in msgs}
+    for t in tasks:
+        q = set(t.query_tokens)
+        for m in msgs:
+            hit = int(len(toks[m.msg_id] & q) >= CONFLICT_OVERLAP)
+            h, n = counters[m.msg_id]
+            counters[m.msg_id] = (h + hit, n + (1 - hit))
+    sc = score(counters, base)
+    ranked = sorted(sc.items(), key=lambda kv: (-kv[1], kv[0]))
+    retained = tuple(mid for mid, _ in ranked[:BUDGET])
+    out = {t.task_id: retained for t in tasks}
+    lifecycle = {"archives": 0, "restores": 0, "probes": 0, "fallbacks": 0}
     return PolicyResult(
         policy=policy, workspaces=out, storage_ids=retained,
         storage_tokens=_storage_tokens(msgs, retained), lifecycle=lifecycle)
@@ -146,15 +228,38 @@ def _online_causal_engine(msgs: Sequence[TraceMsg],
         storage_tokens=_storage_tokens(msgs, retained), lifecycle=lifecycle)
 
 
+_ONLINE_SCORES = {
+    "memory_worth_online": lambda c, b: _posterior_mean(c),
+    "demem_online": lambda c, b: _posterior_deviation(c),
+    "trivium_online": _episodic_demand,
+    "govmem_online": _coverage_loss,
+}
+_BATCH_SCORES = {
+    "memory_worth": lambda c, b: _posterior_mean(c),
+    "demem": lambda c, b: _posterior_deviation(c),
+    "trivium": _episodic_demand,
+    "govmem": _coverage_loss,
+}
+
+
 def run_online_policy(policy: str, trace: Trace) -> Optional[PolicyResult]:
     """Dispatch for the online family (needed_free keeps the same gold-free
     contract as the frozen run_policy)."""
     tasks = needed_free(trace.tasks)
-    if policy == "memory_worth_online":
+    if policy in _ONLINE_SCORES:
         return _online_ratio_engine(trace.msgs, tasks, policy,
-                                    _posterior_mean)
+                                    _ONLINE_SCORES[policy])
     if policy == "causal_item_online":
         return _online_causal_engine(trace.msgs, tasks, policy)
+    return None
+
+
+def run_batch_proxy_policy(policy: str, trace: Trace) -> Optional[PolicyResult]:
+    """Transductive proxy references computed in this file (full-QA
+    counters -> one shared retention set; frozen rows unchanged)."""
+    if policy in _BATCH_SCORES:
+        return _batch_score_engine(trace.msgs, needed_free(trace.tasks),
+                                   policy, _BATCH_SCORES[policy])
     return None
 
 
@@ -219,6 +324,11 @@ def main() -> None:
             for pol in policies:
                 if pol in ONLINE_POLICIES:
                     res = run_online_policy(pol, masked)
+                elif pol in _BATCH_SCORES:
+                    # demem/trivium/govmem transductive references are
+                    # computed here (frozen file untouched); the frozen
+                    # memory_worth/causal_item rows stay on run_policy.
+                    res = run_batch_proxy_policy(pol, masked)
                 else:
                     from .public_unified_contract import run_policy
                     res = run_policy(pol, masked, feats=feats)
@@ -238,11 +348,10 @@ def main() -> None:
                 ds_out["policies"][pol] = {"policy": pol, "skipped": True}
 
         pairs: List[Tuple[str, str]] = []
-        if "memory_worth_online" in evals and "memory_worth" in evals:
-            pairs.append(("memory_worth_online", "memory_worth"))
-        if "causal_item_online" in evals and "causal_item" in evals:
-            pairs.append(("causal_item_online", "causal_item"))
         for pol in ONLINE_POLICIES:
+            base_name = pol.removesuffix("_online")
+            if base_name in evals:
+                pairs.append((pol, base_name))
             for base in ("bm25", "sqcad"):
                 if pol in evals and base in evals:
                     pairs.append((pol, base))
