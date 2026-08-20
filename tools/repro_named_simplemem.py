@@ -46,7 +46,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import threading
 from pathlib import Path
+from types import MethodType
 from typing import Dict, List, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -78,50 +80,65 @@ class CountingLLMClient:
 
     def __init__(self, client) -> None:
         self._c = client
+        # Capture the ORIGINAL bound methods BEFORE the make_system patch
+        # replaces them on the instance -- calling self._c.chat_completion
+        # after the patch would recurse into this wrapper.
+        self._orig_chat = client.chat_completion
+        self._orig_json = client.extract_json
         self.calls = 0
         self.in_chars = 0
         self.out_chars = 0
+        self._lock = threading.Lock()
 
     def chat_completion(self, messages, temperature=0.2,
                         response_format=None, max_retries=3) -> str:
-        self.calls += 1
-        self.in_chars += sum(len(m.get("content", "")) for m in messages)
-        out = self._c.chat_completion(
+        with self._lock:
+            self.calls += 1
+            self.in_chars += sum(len(m.get("content", "")) for m in messages)
+        out = self._orig_chat(
             messages, temperature=0, response_format=response_format,
             max_retries=max_retries)
-        self.out_chars += len(out)
+        with self._lock:
+            self.out_chars += len(out)
         return out
 
     def extract_json(self, text: str):
-        return self._c.extract_json(text)
+        return self._orig_json(text)
 
 
-class ContractedMemoryBuilder:
-    """Provenance wrapper around the official MemoryBuilder: records
-    entry_id -> source dialogue ids for the contract's message-level
-    workspace mapping.  Generation logic is entirely the official one."""
+def patch_source_map(mb, source_map: Dict[str, List[int]],
+                     failed_windows: List[int]) -> None:
+    """Instance-level provenance patch on the OFFICIAL MemoryBuilder.
 
-    def __init__(self, builder, source_map: Dict[str, List[int]]) -> None:
-        self._b = builder
-        self._source_map = source_map
+    Wrapping the builder does not work: the official process_window /
+    process_remaining / parallel workers resolve ``self._generate_memory_*
+    `` on the official instance, so a wrapper's overrides are never reached.
+    An instance attribute (bound via MethodType) is hit by those internal
+    self-calls; generation logic stays 100% official -- the patch only
+    records entry_id -> source window dialogue ids for the contract's
+    message-level workspace mapping, and counts windows whose 3 official
+    retries all failed (returned []) for the degenerate-generation
+    disclosure (35- §2.1 item 8)."""
+    _orig_gen = mb._generate_memory_entries
+    _orig_worker = mb._generate_memory_entries_worker
 
-    def __getattr__(self, name):
-        return getattr(self._b, name)
-
-    def _generate_memory_entries(self, dialogues, dialogue_ids):
-        entries = self._b._generate_memory_entries(dialogues, dialogue_ids)
+    def _gen(self, dialogues):
+        entries = _orig_gen(dialogues)
+        ids = [d.dialogue_id for d in dialogues]
         for e in entries:
-            self._source_map[e.entry_id] = list(dialogue_ids)
+            source_map[e.entry_id] = list(ids)
         return entries
 
-    def add_dialogue(self, dialogue, auto_process=True):
-        return self._b.add_dialogue(dialogue, auto_process=auto_process)
+    def _worker(self, window, dialogue_ids, window_num):
+        entries = _orig_worker(window, dialogue_ids, window_num)
+        if not entries:
+            failed_windows[0] += 1
+        for e in entries:
+            source_map[e.entry_id] = list(dialogue_ids)
+        return entries
 
-    def add_dialogues(self, dialogues, auto_process=True):
-        return self._b.add_dialogues(dialogues, auto_process=auto_process)
-
-    def process_remaining(self):
-        return self._b.process_remaining()
+    mb._generate_memory_entries = MethodType(_gen, mb)
+    mb._generate_memory_entries_worker = MethodType(_worker, mb)
 
 
 def run_simplemem_trace(system, source_map, msgs, tasks, d2m, dialogue_cls):
@@ -133,7 +150,11 @@ def run_simplemem_trace(system, source_map, msgs, tasks, d2m, dialogue_cls):
             dialogue_cls(dialogue_id=i, speaker=m.role, content=m.content,
                          timestamp=m.date))
         d2m[i] = m.msg_id
-    system.memory_builder.add_dialogues(dialogues, auto_process=False)
+    # auto_process=True: the official windowing (WINDOW_SIZE sliding window
+    # with OVERLAP) compresses per window; with parallel processing the
+    # windows run on the worker pool.  finalize() drains the final
+    # sub-window residue.
+    system.memory_builder.add_dialogues(dialogues, auto_process=True)
     system.finalize()
 
     ws: Dict[str, Tuple[str, ...]] = {}
@@ -172,6 +193,7 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
     per: Dict[str, List[dict]] = {r: [] for r in ROWS}
     qa_pairs: List[Tuple[object, PolicyResult]] = []
     llm_usage = {"calls": 0, "in_chars": 0, "out_chars": 0}
+    _calls = _in_chars = _out_chars = 0
 
     for trace in traces:
         masked, _ = (mask_lme_chronological(trace)
@@ -182,10 +204,8 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
         if not tasks:
             continue
 
-        system = cfg["make_system"]()
         source_map: Dict[str, List[int]] = {}
-        system.memory_builder = ContractedMemoryBuilder(
-            system.memory_builder, source_map)
+        system = cfg["make_system"](source_map)
         d2m: Dict[int, str] = {}
         res = run_simplemem_trace(system, source_map, msgs, tasks, d2m,
                                   cfg["dialogue_cls"])
@@ -200,10 +220,12 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
             if name == "locomo" and qa_out is not None:
                 qa_pairs.append((trace, r))
 
-        u = cfg["usage"]
-        u["calls"] += system.llm_client.calls
-        u["in_chars"] += system.llm_client.in_chars
-        u["out_chars"] += system.llm_client.out_chars
+        _calls += system.llm_client.calls
+        _in_chars += system.llm_client.in_chars
+        _out_chars += system.llm_client.out_chars
+
+    llm_usage = {"calls": _calls, "in_chars": _in_chars,
+                 "out_chars": _out_chars}
 
     if qa_out is not None and qa_pairs:
         write_locomo_qa_files(qa_pairs, qa_meta, qa_out)
@@ -264,7 +286,30 @@ def main() -> None:
     sm_config.OPENAI_BASE_URL = args.llm_base_url
     sm_config.LLM_MODEL = args.llm_model
     sm_config.EMBEDDING_MODEL = args.embedding_model
-    sm_config.USE_JSON_FORMAT = True
+    # OpenAI json_object mode forces a JSON OBJECT, but the official parser
+    # (and the extraction prompt) require a JSON ARRAY -- GPT returns an
+    # array anyway; Qwen3-8B returns an object and every window fails to
+    # parse.  With USE_JSON_FORMAT off, Qwen follows the prompt's "Return a
+    # JSON array" instruction and the official extract_json handles any
+    # fenced/embedded array (open-weight substitute layer configuration,
+    # disclosed in 35- §2.1).
+    sm_config.USE_JSON_FORMAT = False
+
+    # Memory-constraint disclosure (35- §2.1): vLLM serves the 8B generator
+    # with util 0.72 (22.6 GB on the 32 GB card), leaving room for the 0.6B
+    # embedder in this process.  The official EmbeddingModel loads a
+    # SentenceTransformer in float32 (2.4 GB) which OOMs; pin
+    # torch_dtype=float16 (same output dimension, 35- reports the dtype as
+    # part of the open-weight protocol).
+    import torch as _torch
+    import sentence_transformers as _st
+    _st_sentence_init = _st.SentenceTransformer.__init__
+
+    def _st_init(self, model_name_or_path, *a, **kw):
+        kw.setdefault("model_kwargs", {})["torch_dtype"] = _torch.float16
+        _st_sentence_init(self, model_name_or_path, *a, **kw)
+
+    _st.SentenceTransformer.__init__ = _st_init
 
     from models.memory_entry import Dialogue
     from utils.embedding import EmbeddingModel as _RealEmbedding
@@ -276,18 +321,81 @@ def main() -> None:
     _db_dir.mkdir(parents=True, exist_ok=True)
     _db_counter = [0]
 
-    def make_system():
-        from utils.llm_client import LLMClient
-        client = LLMClient()
-        wrapped = CountingLLMClient(client)
+    def patch_no_think(llm_client):
+        """Disable Qwen3 thinking at the REQUEST layer.  The official code
+        only injects enable_thinking for dashscope base URLs; on a local
+        vLLM endpoint Qwen3's default thinking mode emits <think> blocks
+        that break the official JSON-array parser.  This patches the
+        underlying openai client's create() with the exact parameter the
+        vLLM serving layer understands (chat_template_kwargs) -- official
+        code untouched (35- §2.1, open-weight substitute layer config).
+
+        Also caps max_tokens at 2048: the official code never sets it, so
+        under vLLM the default is max_model_len (32768) and a degenerate
+        repetition loop (observed on one full-run window) generates tens of
+        thousands of tokens before the JSON parser can fail -- a single
+        window stalled the whole worker pool for minutes (35- §2.1, item 8).
+        Normal window extractions are 500-1500 tokens, so the cap only cuts
+        degenerate runs; the official 3-retry loop then fails them fast
+        (returning [] for that window, counted as failed_windows below)."""
+        _orig = llm_client.client.chat.completions.create
+
+        def _create(**kwargs):
+            # the OpenAI SDK rejects top-level chat_template_kwargs; it must
+            # ride inside extra_body (vLLM reads it from the HTTP body)
+            eb = kwargs.setdefault("extra_body", {})
+            eb["chat_template_kwargs"] = {"enable_thinking": False}
+            kwargs.setdefault("max_tokens", 2048)
+            return _orig(**kwargs)
+
+        llm_client.client.chat.completions.create = _create
+
+    # Embedding-model singleton: the official SimpleMemSystem constructs a
+    # fresh EmbeddingModel per system (main.py), which would load the 0.6B
+    # SentenceTransformer once per trace and accumulate GPU memory until the
+    # full run OOMs (observed 5.6 GB after ~60 traces on a 32 GB card with
+    # vLLM at 22.6 GB).  Sharing one instance across traces is semantically
+    # identical (deterministic same-model inference) and is a memory-layer
+    # configuration, disclosed in 35- §2.1.
+    from utils.embedding import EmbeddingModel as _EM
+    _em_singletons: Dict[str, _EM] = {}
+    _em_orig_new = _EM.__new__
+    _em_orig_init = _EM.__init__
+
+    def _em_new(cls, model_name=None, *a, **kw):
+        inst = _em_singletons.get(model_name)
+        if inst is None:
+            inst = _em_orig_new(cls)
+            _em_singletons[model_name] = inst
+        return inst
+
+    def _em_init(self, model_name=None, *a, **kw):
+        if not hasattr(self, "model"):
+            _em_orig_init(self, model_name, *a, **kw)
+
+    _EM.__new__ = _em_new
+    _EM.__init__ = _em_init
+
+    _failed_windows = [0]
+
+    def make_system(source_map):
         _db_counter[0] += 1
         db_path = str(_db_dir / f"mem_{_db_counter[0]:04d}.lance")
         system = SimpleMemSystem(
             api_key="EMPTY", model=args.llm_model, base_url=args.llm_base_url,
             db_path=db_path, table_name="memory_entries", clear_db=True,
             enable_planning=True, enable_reflection=True,
-            max_reflection_rounds=2, enable_parallel_processing=False,
-            enable_parallel_retrieval=True, max_retrieval_workers=3)
+            max_reflection_rounds=2, enable_parallel_processing=True,
+            max_parallel_workers=8, enable_parallel_retrieval=True,
+            max_retrieval_workers=3)
+        # Wrap the client the SYSTEM actually constructed (its own
+        # LLMClient; MemoryBuilder/HybridRetriever/AnswerGenerator all share
+        # this instance per main.py) -- the CountingLLMClient captures the
+        # original bound methods so the instance patch below does not
+        # recurse.
+        wrapped = CountingLLMClient(system.llm_client)
+        # Disable Qwen3 thinking at the request layer (see patch_no_think)
+        patch_no_think(system.llm_client)
         # route every official LLM call through the counter (single
         # wrapper instance shared by all components)
         for obj in (system.llm_client,
@@ -298,6 +406,10 @@ def main() -> None:
             obj.extract_json = wrapped.extract_json
         system.llm_client = wrapped
         system.hybrid_retriever.llm_client = wrapped
+        # instance-level provenance patch on the official MemoryBuilder
+        # (bound methods are hit by its internal self-calls)
+        patch_source_map(system.memory_builder, source_map,
+                         _failed_windows)
         return system
 
     usage = {"calls": 0, "in_chars": 0, "out_chars": 0}
@@ -321,11 +433,15 @@ def main() -> None:
             "n_boot": N_BOOT, "alpha": 0.05, "method": "studentized",
             "seeds": list(SEEDS),
             "workspace_budget": BUDGET,
+            "max_tokens_cap": 2048,
             "note": ("LLM row: single greedy run (temperature 0); "
-                     "25- zero-diff discipline applies to frozen rows only"),
+                     "25- zero-diff discipline applies to frozen rows only; "
+                     "degenerate-generation windows (all 3 official retries "
+                     "failed) are counted per dataset as failed_windows"),
         },
         "datasets": {},
     }
+    payload["failed_windows_total"] = _failed_windows[0]
     cfg = {"make_system": make_system, "usage": usage,
            "dialogue_cls": Dialogue}
     for name, path in (("longmemeval_s", args.longmemeval),
