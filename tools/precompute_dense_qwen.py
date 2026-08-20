@@ -76,6 +76,11 @@ def main() -> None:
     parser.add_argument("--model", default=MODEL_0_6B,
                         choices=(MODEL_0_6B, MODEL_8B))
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--scores-out", type=Path, default=None,
+                        help=("also dump per-query FULL score maps "
+                              "{sample_id: {task_id: {msg_id: score}}} "
+                              "for the streaming-manager rows "
+                              "(tools/streaming_managed_baselines.py)"))
     args = parser.parse_args()
 
     if args.data is None:
@@ -94,6 +99,8 @@ def main() -> None:
               if args.dataset == "longmemeval_s" else load_locomo(args.data))
 
     cache: dict = {}
+    scores: dict = {}
+    msg_sims: dict = {}
     n_texts = 0
     for trace in traces:
         masked, _ = (mask_lme_chronological(trace)
@@ -108,6 +115,9 @@ def main() -> None:
             # Mirror that exactly so the Qwen row stays item-comparable.
             out = {t.task_id: [] for t in tasks}
             cache[trace.sample_id] = out
+            if args.scores_out is not None:
+                scores[trace.sample_id] = {t.task_id: {} for t in tasks}
+                msg_sims[trace.sample_id] = {}
             print(f"{trace.sample_id}: 0 msgs, {len(tasks)} tasks "
                   f"(empty -> no candidates)", flush=True)
             continue
@@ -117,13 +127,29 @@ def main() -> None:
         q_vecs = [vecs[len(msgs) + i] for i in range(len(tasks))]
 
         msg_mat = torch.tensor(list(msg_vecs.values()), dtype=torch.float32)
+        if args.scores_out is not None:
+            # online salience: mean cosine of message i to the messages
+            # seen so far (strictly chronological, no look-ahead).
+            # Iterate the UNIQUE ids (msg_vecs may collapse duplicate
+            # msg_ids -- same alignment as the frozen zip semantics).
+            sim_mat = msg_mat @ msg_mat.T
+            sims = {}
+            for j, mid in enumerate(msg_vecs):
+                sims[mid] = (0.0 if j == 0
+                             else float(sim_mat[j, :j].mean()))
+            msg_sims[trace.sample_id] = sims
         out: dict = {}
+        out_scores: dict = {}
         for t, qv in zip(tasks, q_vecs):
-            scores = (msg_mat @ torch.tensor(qv, dtype=torch.float32)).tolist()
-            ranked = sorted(zip(msg_vecs.keys(), scores),
+            scores_ = (msg_mat @ torch.tensor(qv, dtype=torch.float32)).tolist()
+            if args.scores_out is not None:
+                out_scores[t.task_id] = dict(zip(msg_vecs.keys(), scores_))
+            ranked = sorted(zip(msg_vecs.keys(), scores_),
                             key=lambda kv: (-kv[1], kv[0]))
             out[t.task_id] = [mid for mid, _ in ranked[:BUDGET]]
         cache[trace.sample_id] = out
+        if args.scores_out is not None:
+            scores[trace.sample_id] = out_scores
         n_texts += len(texts)
         print(f"{trace.sample_id}: {len(msgs)} msgs, {len(tasks)} tasks",
               flush=True)
@@ -134,6 +160,13 @@ def main() -> None:
          "n_texts": n_texts, "cache": cache},
         ensure_ascii=False), encoding="utf-8")
     print(f"wrote {args.out} ({n_texts} texts embedded)")
+    if args.scores_out is not None:
+        args.scores_out.parent.mkdir(parents=True, exist_ok=True)
+        args.scores_out.write_text(json.dumps(
+            {"model": args.model, "dataset": args.dataset, "budget": BUDGET,
+             "scores": scores, "msg_sims": msg_sims},
+            ensure_ascii=False), encoding="utf-8")
+        print(f"wrote {args.scores_out} (full score maps + msg_sims)")
 
 
 if __name__ == "__main__":
