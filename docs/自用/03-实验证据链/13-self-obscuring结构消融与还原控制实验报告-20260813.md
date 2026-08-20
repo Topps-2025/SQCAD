@@ -1,6 +1,6 @@
 # 13-self-obscuring 结构消融与还原控制实验报告-20260813：T1/T2 机制证据链
 
-> **本报告执行 `docs/自用/01-research-gap/研究路线与方案/14-Agent-Memory基础理论空缺与下一阶段实验路线-20260813.md` §5/§7 的实验 A（结构消融 W0–W3 + self-confirming 全对比）与实验 B（reduction controls）**。代码 `src/sqcad/self_obscuring_ablation.py`（15 项新测试随全套 239 项通过）；结果 `results/self_obscuring_ablation.json`（12 seeds，seed 21–32）；T1/T2 的严格证明见 `docs/自用/01-research-gap/研究逻辑与理论证明/15-self-obscuring形式定理与严格证明-20260813.md`。
+> **本报告执行历史路线方案 `docs/自用/02-历史草稿/研究路线与方案/14-Agent-Memory基础理论空缺与下一阶段实验路线-20260813.md` §5/§7 的实验 A（结构消融 W0–W3 + self-confirming 全对比）与实验 B（reduction controls）**。代码 `src/sqcad/self_obscuring_ablation.py`（15 项新测试随全套 239 项通过）；结果 `results/self_obscuring_ablation.json`（12 seeds，seed 21–32）；T1/T2 的严格证明见 `docs/自用/01-research-gap/研究逻辑与理论证明/15-self-obscuring形式定理与严格证明-20260813.md`。
 
 **状态：计算验证级 + 形式化证明配套（15-）**。本报告回答：self-obscuring 闭环（治理动作 → 未来候选/证据流 → 未来可识别性 → 后续治理动作）是否是 Agent Memory 持久访问结构**不可约**地产生的机制——把关键结构去掉，现象是否消失。
 
