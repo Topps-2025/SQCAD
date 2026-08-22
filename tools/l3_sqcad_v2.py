@@ -240,6 +240,168 @@ def _bucket_means(pairs: Sequence[Tuple[str, float]]) -> Dict[str, float]:
     return {b: sum(vs) / len(vs) for b, vs in acc.items()}
 
 
+def bootstrap_stratified_diff(pa: Sequence[Tuple[str, float]],
+                              pb: Sequence[Tuple[str, float]],
+                              n_boot: int = 2000, seed: int = 20260817,
+                              label: str = "") -> Dict[str, any]:
+    """TWO-STAGE CLUSTER bootstrap: resample BUCKETS with replacement, then
+    episodes within each drawn bucket.  This is the correct third view, and it
+    is reported alongside the bucket-level CI, never instead of it.
+
+    Measured negative that motivates the two-stage form: an earlier version of
+    this function resampled only WITHIN bucket, holding bucket composition
+    fixed.  That produced CIs of literally zero width (memory_worth:
+    [+4.3405, +4.3405]), because episodes inside a bucket are surface
+    replications of one rule world, so almost none of the variance lives
+    within a bucket.  A within-bucket-only scheme therefore understates
+    uncertainty exactly as the flat n=1380 bootstrap does; it cannot
+    corroborate the bucket-level CI.  `within_bucket_only_note` in the
+    artifact records this so the discarded scheme is not silently dropped.
+    """
+    ga: Dict[str, List[float]] = {}
+    gb: Dict[str, List[float]] = {}
+    for (b, v), (b2, v2) in zip(pa, pb):
+        assert b == b2, "stratified pairing requires aligned bucket order"
+        ga.setdefault(b, []).append(v)
+        gb.setdefault(b, []).append(v2)
+    keys = sorted(ga)
+    rng = random.Random(seed)
+    diffs = []
+    for _ in range(n_boot):
+        num = 0.0
+        den = 0
+        # stage 1: buckets with replacement (the actual unit of variation)
+        for _k in range(len(keys)):
+            b = keys[rng.randrange(len(keys))]
+            va, vb = ga[b], gb[b]
+            # stage 2: episodes within the drawn bucket
+            for _j in range(len(va)):
+                i = rng.randrange(len(va))
+                num += va[i] - vb[i]
+                den += 1
+        diffs.append(num / max(den, 1))
+    diffs.sort()
+    lo, hi = diffs[25], diffs[-26]
+    return {"diff_mean": round(sum(diffs) / len(diffs), 4),
+            "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
+            "significant": not (lo <= 0.0 <= hi),
+            "n_buckets": len(keys), "n_episodes": len(pa),
+            "scheme": "two-stage cluster: buckets with replacement, then "
+                      "episodes within each drawn bucket",
+            "within_bucket_only_note": (
+                "a within-bucket-only variant was tried first and rejected: it "
+                "yields zero-width CIs because episodes in a bucket are "
+                "surface replications of one rule world, so it understates "
+                "uncertainty like the flat n=1380 bootstrap"),
+            "label": label}
+
+
+def bootstrap_p_centered(pa: Sequence[Tuple[str, float]],
+                         pb: Sequence[Tuple[str, float]],
+                         n_boot: int = 2000, seed: int = 20260818) -> float:
+    """Two-sided bootstrap p against a CENTERED null, at the bucket unit.
+
+    This is the estimator `tools/l3_stat_robustness.py:107` uses, reproduced
+    here so the two Holm families below differ only in the p definition.
+
+    Why both are reported: `bootstrap_bucket_diff`'s `p_boot` is the tail of
+    the SAME uncentered draws that produce the percentile CI, so a Holm run on
+    it cannot disagree with the CI criterion -- it restates the interval with a
+    multiplicity penalty rather than testing anything new.  Centering each
+    bucket's paired differences before resampling builds an actual null, under
+    which a small but almost perfectly sign-consistent effect (no_restore:
+    -0.028 with a CI touching zero) can reject while the percentile interval
+    does not.  That is the exact disagreement 31- Sec 5.3 reports, and pinning it
+    to a named estimator keeps it from looking like a reporting choice.
+    """
+    per: Dict[str, List[float]] = {}
+    for (b, v), (b2, v2) in zip(pa, pb):
+        assert b == b2, "centered-null pairing requires aligned bucket order"
+        per.setdefault(b, []).append(v - v2)
+    keys = sorted(per)
+    obs = sum(sum(per[b]) / len(per[b]) for b in keys) / len(keys)
+    centered = {b: [d - sum(per[b]) / len(per[b]) for d in per[b]]
+                for b in keys}
+    rng = random.Random(seed)
+    hits = 0
+    for _ in range(n_boot):
+        acc = 0.0
+        for _k in range(len(keys)):
+            a = centered[keys[rng.randrange(len(keys))]]
+            acc += sum(a[rng.randrange(len(a))] for _j in range(len(a))) \
+                / len(a)
+        if abs(acc / len(keys)) >= abs(obs):
+            hits += 1
+    return (hits + 1) / (n_boot + 1)
+
+
+SEED_SWEEP = (20260817, 20260812, 1, 2, 3, 7, 42, 999)
+
+
+def seed_robustness(pa: Sequence[Tuple[str, float]],
+                    pb: Sequence[Tuple[str, float]],
+                    label: str = "") -> Dict[str, any]:
+    """Re-run the two-stage cluster CI across SEED_SWEEP and report how often
+    it excludes zero.
+
+    Motivation (a measured negative that changed a main-text claim): at n=14
+    buckets some contrasts sit on a knife edge where the percentile lower bound
+    is within ~0.01 of zero, so significance flips with the resample seed
+    alone.  `storage12`/`memory_worth` is significant in 4/8 seeds while
+    `keep_all` is 8/8 and `sqcad_cert` 0/8.  Reporting a single pre-registered
+    seed would have made a coin-flip look like a finding, so contrasts below
+    `stable_threshold` are reported as seed-fragile rather than significant.
+    """
+    los, sig = [], 0
+    for sd in SEED_SWEEP:
+        r = bootstrap_stratified_diff(pa, pb, seed=sd)
+        los.append(r["ci_lo"])
+        sig += bool(r["significant"])
+    n = len(SEED_SWEEP)
+    return {"n_seeds": n, "n_significant": sig,
+            "ci_lo_min": round(min(los), 5), "ci_lo_max": round(max(los), 5),
+            "seeds": list(SEED_SWEEP),
+            "stable": sig == n, "seed_fragile": 0 < sig < n,
+            "verdict": ("stable across every seed" if sig == n else
+                        "never significant" if sig == 0 else
+                        f"SEED-FRAGILE: {sig}/{n} seeds -- do not report as "
+                        f"significant"),
+            "label": label}
+
+
+def holm_bonferroni(pvals: Dict[str, float],
+                    alpha: float = 0.05) -> Dict[str, any]:
+    """Holm-Bonferroni over a PRE-REGISTERED family (the five ablations).
+
+    `pvals` may carry either p definition; the caller labels which.  See
+    `bootstrap_p_centered` for why both are run.
+    """
+    order = sorted(pvals.items(), key=lambda kv: kv[1])
+    m = len(order)
+    out: Dict[str, any] = {}
+    # Step-down: adjusted p is the running maximum of (m - rank) * p_raw, and a
+    # test can only be rejected if every smaller-p test was also rejected.
+    running = 0.0
+    still_rejecting = True
+    for rank, (name, p) in enumerate(order):
+        running = max(running, (m - rank) * p)
+        p_adj = min(1.0, running)
+        if still_rejecting and p_adj > alpha:
+            still_rejecting = False
+        out[name] = {
+            "p_raw": round(p, 6),
+            "p_holm": round(p_adj, 6),
+            "threshold": round(alpha / (m - rank), 6),
+            "reject_at_0.05": bool(still_rejecting),
+            "rank": rank + 1,
+        }
+    return {"family_size": m, "alpha": alpha,
+            "note": ("p_raw is the two-sided bootstrap tail probability of the "
+                     "opposite sign at the honest bucket-level unit count; "
+                     "resolution floor is 1/n_boot"),
+            "tests": out}
+
+
 def bootstrap_bucket_diff(pa: Sequence[Tuple[str, float]],
                           pb: Sequence[Tuple[str, float]],
                           n_boot: int = 2000, seed: int = 20260817,
@@ -258,9 +420,16 @@ def bootstrap_bucket_diff(pa: Sequence[Tuple[str, float]],
         diffs.append(da - db)
     diffs.sort()
     lo, hi = diffs[25], diffs[-26]
+    # Two-sided bootstrap tail of the opposite sign, for the Holm family below.
+    # Floor at 1/n_boot: the bootstrap cannot resolve a smaller tail, so
+    # reporting 0 would claim precision the resample count does not carry.
+    n_opp = sum(1 for d in diffs if d <= 0.0) if sum(diffs) > 0 else \
+        sum(1 for d in diffs if d >= 0.0)
+    p_boot = min(1.0, max(1.0 / n_boot, 2.0 * n_opp / n_boot))
     return {"diff_mean": round(sum(diffs) / len(diffs), 4),
             "ci_lo": round(lo, 4), "ci_hi": round(hi, 4),
             "significant": not (lo <= 0.0 <= hi),
+            "p_boot": round(p_boot, 6),
             "n_buckets": len(keys),
             "distinct_per_bucket": {b: len({v for _, v in pa if b == _})
                                     for b in keys},
@@ -313,8 +482,14 @@ def main() -> None:
     ep_by_id = {ep.world.episode_id: ep for ep in eps}
 
     # reference rows for bootstrap comparison (frozen, already audited)
+    # G-8(2): memory_worth / keep_all had NO paired CI artifact anywhere in the
+    # tree, yet the main text claimed SQCAD "significantly outperforms all
+    # score-only baselines".  They are added here so every significance claim
+    # can point at an artifact; `sqcad_cert_conflict` is the lineage-fix row and
+    # already carried one.
     frozen_rows = {name: [] for name in
-                   ("probe_willing", "sqcad_cert", "sqcad_cert_conflict")}
+                   ("probe_willing", "sqcad_cert", "sqcad_cert_conflict",
+                    "memory_worth", "keep_all")}
     for name, fn in DECISION_POLICIES.items():
         if name not in frozen_rows:
             continue
@@ -343,6 +518,8 @@ def main() -> None:
     for ref, base in (("sqcad_v2", "probe_willing"),
                       ("sqcad_v2", "sqcad_cert"),
                       ("sqcad_v2", "sqcad_cert_conflict"),
+                      ("sqcad_v2", "memory_worth"),
+                      ("sqcad_v2", "keep_all"),
                       ("sqcad_v2_probe", "sqcad_v2")):
         boot[f"{ref}-{base}"] = bootstrap_diff(values_of(ref),
                                                values_of(base))
@@ -362,6 +539,8 @@ def main() -> None:
     for ref, base in (("sqcad_v2", "probe_willing"),
                       ("sqcad_v2", "sqcad_cert"),
                       ("sqcad_v2", "sqcad_cert_conflict"),
+                      ("sqcad_v2", "memory_worth"),
+                      ("sqcad_v2", "keep_all"),
                       ("sqcad_v2_probe", "sqcad_v2")):
         boot_bucket[f"{ref}-{base}"] = bootstrap_bucket_diff(
             bucket_pairs_of(ref), bucket_pairs_of(base),
@@ -373,11 +552,65 @@ def main() -> None:
              zip(eps, abl["sqcad_v2"][cfg_name]["values"])],
             label=f"sqcad_v2-no_{cfg_name}")
 
+    # G-8(3): stratified episode-level bootstrap (bucket = random effect),
+    # reported ALONGSIDE the bucket-level CI so the reader can see the
+    # conclusion does not depend on the resampling scheme.
+    boot_strat = {}
+    for ref, base in (("sqcad_v2", "sqcad_cert"),
+                      ("sqcad_v2", "memory_worth"),
+                      ("sqcad_v2", "keep_all")):
+        boot_strat[f"{ref}-{base}"] = bootstrap_stratified_diff(
+            bucket_pairs_of(ref), bucket_pairs_of(base),
+            label=f"{ref}-{base}")
+    for cfg_name in ABLATIONS:
+        boot_strat[f"sqcad_v2-no_{cfg_name}"] = bootstrap_stratified_diff(
+            bucket_pairs_of("sqcad_v2"),
+            [(BUCKET_KEY(ep), v) for ep, v in
+             zip(eps, abl["sqcad_v2"][cfg_name]["values"])],
+            label=f"sqcad_v2-no_{cfg_name}")
+
+    # Seed robustness over every baseline the main text calls significant, plus
+    # the ablation family.  See `seed_robustness`: this is what demoted the
+    # storage12/memory_worth contrast from "significant" to "seed-fragile".
+    seed_rob = {}
+    for name in ("keep_all", "memory_worth", "sqcad_cert",
+                 "sqcad_cert_conflict"):
+        seed_rob[f"sqcad_v2-{name}"] = seed_robustness(
+            bucket_pairs_of("sqcad_v2"), bucket_pairs_of(name),
+            label=f"sqcad_v2-{name}")
+    for cfg_name in ABLATIONS:
+        seed_rob[f"sqcad_v2-no_{cfg_name}"] = seed_robustness(
+            bucket_pairs_of("sqcad_v2"),
+            [(BUCKET_KEY(ep), v) for ep, v in
+             zip(eps, abl["sqcad_v2"][cfg_name]["values"])],
+            label=f"sqcad_v2-no_{cfg_name}")
+
+    # Holm-Bonferroni over the PRE-REGISTERED five-ablation family, at the
+    # honest bucket-level unit count, under BOTH p definitions.  They disagree,
+    # and the disagreement is the reportable content: see bootstrap_p_centered.
+    holm = holm_bonferroni({
+        c: boot_bucket[f"sqcad_v2-no_{c}"]["p_boot"] for c in ABLATIONS})
+    holm["p_definition"] = ("tail of the same uncentered draws as the "
+                            "percentile CI -- cannot disagree with the CI "
+                            "criterion by construction")
+    holm_centered = holm_bonferroni({
+        c: bootstrap_p_centered(
+            bucket_pairs_of("sqcad_v2"),
+            [(BUCKET_KEY(ep), v) for ep, v in
+             zip(eps, abl["sqcad_v2"][c]["values"])])
+        for c in ABLATIONS})
+    holm_centered["p_definition"] = (
+        "centered-null bootstrap at the bucket unit (the estimator of "
+        "tools/l3_stat_robustness.py:107); this is the criterion under which "
+        "the small sign-consistent probe/restore effects reject while their "
+        "percentile CIs still touch zero")
+
     table = {}
     for b in sorted({r["bucket"] for r in fam["sqcad_v2"]["rows"]}):
         table[b] = {}
         for name in ("sqcad_v2", "sqcad_v2_probe", "probe_willing",
-                     "sqcad_cert_conflict", "sqcad_cert"):
+                     "sqcad_cert_conflict", "sqcad_cert",
+                     "memory_worth", "keep_all"):
             if name in fam:
                 vals = [r["value"] for r in fam[name]["rows"]
                         if r["bucket"] == b]
@@ -387,7 +620,19 @@ def main() -> None:
             table[b][name] = round(sum(vals) / len(vals), 4) if vals else None
 
     payload = {"family": fam, "bootstrap": boot, "ablations": abl,
-               "per_bucket": table, "bootstrap_bucket": boot_bucket}
+               "per_bucket": table, "bootstrap_bucket": boot_bucket,
+               "bootstrap_stratified": boot_strat,
+               "holm_ablation_family": holm,
+               "holm_ablation_family_centered": holm_centered,
+               "seed_robustness": seed_rob,
+               "unit_note": ("PRIMARY unit is the bucket (rule-world "
+                             "instantiation, n~14). The flat n=1380 episode "
+                             "bootstrap is retained for continuity but "
+                             "overstates precision, since episodes within a "
+                             "bucket are surface replications of one rule "
+                             "world. bootstrap_stratified resamples episodes "
+                             "WITHIN bucket as a third view. Holm is applied "
+                             "to the five-ablation family at bucket level.")}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
                         encoding="utf-8")

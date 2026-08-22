@@ -11,7 +11,7 @@ REM 设置变量
 set CLOUD_HOST=connect.westb.seetacloud.com
 set CLOUD_PORT=16420
 set CLOUD_USER=root
-set CLOUD_PASS=o4F9PfgQzTR8
+set CLOUD_PASS=${SQCAD_SSH_PASSWORD}
 set LOCAL_SQCAD=C:\Users\Lenovo\Desktop\Paper\SQCAD
 set CLOUD_WORK=/root/autodl-tmp/sqcad_workspace/SQCAD
 
@@ -52,7 +52,7 @@ echo ========================================
 echo.
 echo 1. 打开 Git Bash 或 PowerShell
 echo 2. 执行: ssh -p 16420 root@connect.westb.seetacloud.com
-echo 3. 输入密码: o4F9PfgQzTR8
+echo 3. 输入密码: ${SQCAD_SSH_PASSWORD}
 echo 4. 执行以下命令:
 echo.
 echo    cd /root/autodl-tmp/sqcad_workspace/SQCAD

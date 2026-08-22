@@ -86,7 +86,15 @@ SEEDS = (20260812, 20260817)
 # tokens, LoCoMo 1646 tokens.
 BUDGET_TOKENS = {"longmemeval_s": 1631, "locomo": 1646}
 METRICS = ("hit_rate", "recall_mean", "tokens_mean")
-STREAM_ROWS = ("bm25_stream", "dense_stream")
+STREAM_ROWS = ("bm25_stream", "dense_stream",
+               "lru_stream", "recency_stream", "hybrid_stream")
+# G-6: storage-matched controls sharing the engine, budget and admission rule
+# with bm25_stream; only the retention signal differs.  `recency_stream` is
+# retained but is NOT independent: it is provably the same policy as
+# `lru_stream` under this rank-only eviction rule (see make_recency_salience),
+# so the gate reports TWO independent controls, not three.
+STORAGE_MATCHED_ROWS = ("lru_stream", "recency_stream", "hybrid_stream")
+INDEPENDENT_STORAGE_MATCHED_ROWS = ("lru_stream", "hybrid_stream")
 
 
 def _admit(store: Dict[str, float], order: Dict[str, int],
@@ -134,11 +142,15 @@ def stream_engine(msgs: Sequence, tasks: Sequence,
     ever_evicted = set()
     ws: Dict[str, Tuple[str, ...]] = {}
     lifecycle = {"archives": 0, "restores": 0, "probes": 0, "fallbacks": 0}
+    # Salience functions that re-score residents (LRU, recency) declare it, so
+    # the engine hands them the live salience map instead of guessing by arity.
+    wants_state = bool(getattr(salience_fn, "wants_state", False))
+    touch = getattr(salience_fn, "touch", None)
 
     # 1. message admission (chronological, strictly online)
     for i, m in enumerate(msgs):
-        s = salience_fn(msgs, i)
-        sal[m.msg_id] = s.get(m.msg_id, 0.0)
+        s = salience_fn(msgs, i, sal) if wants_state else salience_fn(msgs, i)
+        sal.update(s)
         _admit(store, order, sal, sizes, budget_tokens, lifecycle,
                ever_evicted, m.msg_id)
 
@@ -148,6 +160,11 @@ def stream_engine(msgs: Sequence, tasks: Sequence,
         ranked = sorted(((mid, scores.get(mid, 0.0)) for mid in store),
                         key=lambda kv: (-kv[1], kv[0]))
         ws[t.task_id] = tuple(mid for mid, _ in ranked[:BUDGET])
+        # Recency-family policies must see a *use* as a refresh, otherwise the
+        # eviction order stays arrival order and "LRU" degenerates to FIFO.
+        if touch is not None:
+            for mid in ws[t.task_id]:
+                touch(mid, sal)
         for mid, _ in sorted(scores.items(), key=lambda kv: (-kv[1], kv[0])):
             if mid in store:
                 continue
@@ -184,6 +201,110 @@ def make_bm25_salience():
 
 def bm25_scorer(msgs: Sequence, task: object) -> Dict[str, float]:
     return bm25_scores(msgs, task.query_tokens)
+
+
+# ---------------------------------------------------------------------------
+# G-6 storage-matched controls.  Same engine, same token budget, same
+# replace-worst admission -- only the salience signal differs, so any gap is
+# attributable to the retention signal and not to a storage advantage.
+# ---------------------------------------------------------------------------
+
+def make_lru_salience():
+    """True LRU: salience = logical time of last *use*.
+
+    Admission stamps the clock; `touch` re-stamps it whenever the item enters
+    a workspace.  Without that second half the eviction order never leaves
+    arrival order and this is FIFO wearing an LRU label -- the engine calls
+    `touch` at task time for exactly this reason.
+    """
+    clock = 0
+
+    def _s(msgs: Sequence, i: int, sal: Dict[str, float]) -> Dict[str, float]:
+        nonlocal clock
+        clock += 1
+        return {msgs[i].msg_id: float(clock)}
+
+    def _touch(mid: str, sal: Dict[str, float]) -> None:
+        nonlocal clock
+        clock += 1
+        sal[mid] = float(clock)
+
+    _s.wants_state = True
+    _s.touch = _touch
+    return _s
+
+
+def make_recency_salience(half_life: float = 50.0):
+    """Exponential time decay over the ONLINE prefix.
+
+    NOT AN INDEPENDENT CONTROL -- kept only to document a measured negative.
+
+    Two successive versions of this row came out byte-identical to
+    `lru_stream` on every metric of both datasets, for two different reasons.
+    The first scored 2^(-(len(msgs)-1-i)/half_life), reading total stream
+    length at admission time: a future leak, and monotone in `i`, so it
+    collapsed onto FIFO.  Fixing that (decay the live residents instead, as
+    below) did NOT separate the rows, because the eviction rule at `_admit`
+    reads only the ARGMIN of (salience, -order) -- never the magnitudes.
+
+    Decaying every resident by a common positive factor is a monotone
+    transform of the LRU clock, so it preserves that argmin.  Verified: over
+    40 admissions plus interleaved touches, the induced ranking differs at 3
+    of 5 touch steps, yet the evicted element is the same at every single
+    step.  Graded recency is therefore the SAME POLICY as LRU under a
+    rank-only replace-worst rule; it can only differ once it competes against
+    a second, non-recency signal, which is exactly `hybrid_stream`.
+
+    G-6 consequently reports TWO independent storage-matched controls
+    (`lru_stream`, `hybrid_stream`), not three.  Counting this row as a third
+    would pad the control count with a duplicate of the first.
+    """
+    def _s(msgs: Sequence, i: int, sal: Dict[str, float]) -> Dict[str, float]:
+        decay = 2.0 ** (-1.0 / half_life)
+        out = {mid: v * decay for mid, v in sal.items()}
+        out[msgs[i].msg_id] = 1.0
+        return out
+
+    def _touch(mid: str, sal: Dict[str, float]) -> None:
+        sal[mid] = 1.0
+
+    _s.wants_state = True
+    _s.touch = _touch
+    return _s
+
+
+def make_hybrid_salience(half_life: float = 50.0, w_recency: float = 0.5):
+    """Hybrid recency x informativeness: the geometric-style blend of the
+    online-idf self-information signal and the recency signal.  This is the
+    strongest storage-matched control -- it has both signals the paper's
+    mechanism claims to need, at identical storage."""
+    bm25_sal = make_bm25_salience()
+
+    # Recency is tracked in a private map so the blend keeps its own decayed
+    # component; the returned salience is the blended value the store evicts on.
+    rec: Dict[str, float] = {}
+    info_of: Dict[str, float] = {}
+    decay = 2.0 ** (-1.0 / half_life)
+
+    def _blend(mid: str) -> float:
+        return float((1.0 - w_recency) * info_of.get(mid, 0.0)
+                     + w_recency * rec.get(mid, 0.0) * 100.0)
+
+    def _s(msgs: Sequence, i: int, sal: Dict[str, float]) -> Dict[str, float]:
+        mid = msgs[i].msg_id
+        info_of[mid] = bm25_sal(msgs, i).get(mid, 0.0)
+        for k in list(rec):
+            rec[k] *= decay
+        rec[mid] = 1.0
+        return {k: _blend(k) for k in rec}
+
+    def _touch(mid: str, sal: Dict[str, float]) -> None:
+        rec[mid] = 1.0
+        sal[mid] = _blend(mid)
+
+    _s.wants_state = True
+    _s.touch = _touch
+    return _s
 
 
 class DenseScores:
@@ -238,6 +359,13 @@ def run_dataset(name: str, data_path: Path, dense_scores: Path | None,
             if row == "bm25_stream":
                 salience_fn = make_bm25_salience()
                 scorer = bm25_scorer
+            elif row in STORAGE_MATCHED_ROWS:
+                # identical retrieval scorer as bm25_stream, so the ONLY
+                # difference is the retention signal (G-6 storage-matched)
+                salience_fn = {"lru_stream": make_lru_salience,
+                               "recency_stream": make_recency_salience,
+                               "hybrid_stream": make_hybrid_salience}[row]()
+                scorer = bm25_scorer
             else:
                 if ds is None or trace.sample_id not in ds.scores:
                     continue
@@ -267,6 +395,27 @@ def run_dataset(name: str, data_path: Path, dense_scores: Path | None,
         out["rows"][row] = {"aggregate": aggregate(row, evals)}
         for m in METRICS:
             out["rows"][row][m] = [e[m] for e in evals if e[m] is not None]
+    # Duplicate-policy audit.  Two rows that agree to the last bit on every
+    # metric are the same policy wearing two labels; reporting them as separate
+    # storage-matched controls would inflate the control count.  This records
+    # the equivalence in the artifact instead of leaving it to a reader.
+    out["duplicate_rows"] = []
+    names = [r for r in STREAM_ROWS if r in out["rows"]]
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            same = []
+            for m in METRICS:
+                va, vb = out["rows"][a][m], out["rows"][b][m]
+                if len(va) == len(vb) and all(
+                        x == y for x, y in zip(va, vb)):
+                    same.append(m)
+            if len(same) == len(METRICS):
+                out["duplicate_rows"].append({
+                    "rows": [a, b],
+                    "note": ("identical on every per-trace value of every "
+                             "metric -- same policy, not an independent "
+                             "control"),
+                })
     out["significance_vs_sqcad"] = {}
     for row in STREAM_ROWS:
         if row not in out["rows"]:

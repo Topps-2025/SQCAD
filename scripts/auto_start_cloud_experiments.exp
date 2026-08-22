@@ -1,0 +1,65 @@
+#!/usr/bin/expect -f
+# 自动化云端实验启动脚本
+# 使用 expect 处理 SSH 密码认证
+
+set timeout 300
+set password "${SQCAD_SSH_PASSWORD}"
+set host "connect.westb.seetacloud.com"
+set port "16420"
+set user "root"
+
+# 上传 Phase 1 脚本
+spawn scp -P $port C:/Users/Lenovo/Desktop/Paper/SQCAD/scripts/cloud_phase1_experiments.sh $user@$host:/root/autodl-tmp/sqcad_workspace/SQCAD/scripts/
+expect {
+    "password:" { send "$password\r" }
+    "yes/no" { send "yes\r"; exp_continue }
+}
+expect eof
+
+puts "\n=== Phase 1 脚本上传完成 ===\n"
+
+# 上传 Phase 2 脚本
+spawn scp -P $port C:/Users/Lenovo/Desktop/Paper/SQCAD/scripts/cloud_phase2_experiments.sh $user@$host:/root/autodl-tmp/sqcad_workspace/SQCAD/scripts/
+expect {
+    "password:" { send "$password\r" }
+}
+expect eof
+
+puts "\n=== Phase 2 脚本上传完成 ===\n"
+
+# SSH 连接并启动实验
+spawn ssh -p $port $user@$host
+expect {
+    "password:" { send "$password\r" }
+}
+
+expect "#"
+send "cd /root/autodl-tmp/sqcad_workspace/SQCAD\r"
+
+expect "#"
+send "chmod +x scripts/cloud_phase1_experiments.sh\r"
+
+expect "#"
+send "mkdir -p logs\r"
+
+expect "#"
+send "nohup bash scripts/cloud_phase1_experiments.sh > logs/phase1_\$(date +%Y%m%d_%H%M).log 2>&1 &\r"
+
+expect "#"
+send "echo \"Phase 1 实验已启动，进程 ID: \$!\"\r"
+
+expect "#"
+send "ps aux | grep cloud_phase1 | grep -v grep\r"
+
+expect "#"
+send "tail -n 50 logs/phase1_*.log\r"
+
+expect "#"
+send "echo '=== 实验启动完成，保持连接监控 ==='\r"
+
+# 保持连接，显示日志
+expect "#"
+send "tail -f logs/phase1_*.log\r"
+
+# 让用户可以 Ctrl+C 退出但实验继续运行
+interact

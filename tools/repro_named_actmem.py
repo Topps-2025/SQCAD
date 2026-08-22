@@ -65,6 +65,7 @@ from sqcad.public_unified_contract import (
     evaluate_trace, mask_lme_chronological, needed_free, run_policy,
     trace_features, write_locomo_qa_files,
 )
+from sqcad.stage_cache import StageCache
 from sqcad.trace_grounded_runner import (
     TOKEN_RE, load_locomo, load_longmemeval_s,
 )
@@ -108,16 +109,30 @@ class VLLMClient:
     """OpenAI-compatible endpoint client (vLLM), temperature 0, with
     usage counters."""
 
-    def __init__(self, base_url: str, model: str) -> None:
+    def __init__(self, base_url: str, model: str,
+                 cache: "StageCache | None" = None) -> None:
         from openai import OpenAI
         self._c = OpenAI(api_key="EMPTY", base_url=base_url)
         self.model = model
         self.calls = 0
         self.in_chars = 0
         self.out_chars = 0
+        self.cache_hits = 0
+        self._cache = cache
         self._lock = threading.Lock()
 
     def chat(self, system: str, user: str) -> str:
+        ck = None
+        if self._cache is not None:
+            ck = StageCache.key(self.model, system, user)
+            hit = self._cache.get(ck)
+            if hit is not None:
+                # A cache hit is a resumed generation, not a new one: it must
+                # NOT enter `calls`/`in_chars`/`out_chars`, because those are
+                # reported as this row's generation cost.  Counted separately.
+                with self._lock:
+                    self.cache_hits += 1
+                return hit
         with self._lock:
             self.calls += 1
             self.in_chars += len(system) + len(user)
@@ -134,6 +149,8 @@ class VLLMClient:
         text = r.choices[0].message.content or ""
         with self._lock:
             self.out_chars += len(text)
+        if ck is not None:
+            self._cache.put(ck, text)
         return text
 
     def chat_many(self, system: str, users: Sequence[str],
@@ -415,7 +432,14 @@ def _dataset_payload(name: str, per: Dict[str, List[dict]], stats_tot: dict,
                  "rows": {}, "stats": stats_tot,
                  "llm_usage": {"calls": cfg["llm"].calls,
                                "in_chars": cfg["llm"].in_chars,
-                               "out_chars": cfg["llm"].out_chars}}
+                               "out_chars": cfg["llm"].out_chars,
+                               "cache_hits": cfg["llm"].cache_hits,
+                               "cache_hits_note": (
+                                   "generations served from the stage cache on "
+                                   "a resumed run; excluded from calls/chars, "
+                                   "so `calls` is fresh generation only and a "
+                                   "resumed total is not comparable to a "
+                                   "single-shot run's cost")}}
     for row, evals in per.items():
         if not evals:
             continue
@@ -512,6 +536,13 @@ def main() -> None:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--checkpoint-dir", type=Path, default=None,
                      help="write an atomic per-trace checkpoint under this directory")
+    ap.add_argument("--stage-cache", type=Path, default=None,
+                     help="append-only JSONL cache of completed LLM "
+                          "generations, keyed by sha256(model, system, "
+                          "prompt).  Re-running with the same path resumes "
+                          "mid-trace: fact extraction already paid for is not "
+                          "re-generated when a later stage (embedding/PMI/QA) "
+                          "fails.  Keep this on the data disk.")
     ap.add_argument("--only", choices=("longmemeval_s", "locomo"), default=None)
     ap.add_argument("--max-traces", type=int, default=None)
     ap.add_argument("--tau-cluster", type=float, default=0.75)
@@ -520,7 +551,11 @@ def main() -> None:
     ap.add_argument("--top-k", type=int, default=12)
     args = ap.parse_args()
 
-    llm = VLLMClient(args.llm_base_url, args.llm_model)
+    stage_cache = StageCache(args.stage_cache)
+    if args.stage_cache is not None:
+        print(f"stage cache: {args.stage_cache} "
+              f"({len(stage_cache._mem)} entries loaded)", flush=True)
+    llm = VLLMClient(args.llm_base_url, args.llm_model, cache=stage_cache)
     emb = EmbeddingModel(args.embedding_model)
     pmi = PMIValidator(args.pmi_model)
     cfg = {"llm": llm, "emb": emb, "pmi": pmi,
@@ -586,10 +621,14 @@ def main() -> None:
                       f"{e['mean_diff']:+.4f} [{c['ci_low']:+.4f}, "
                       f"{c['ci_high']:+.4f}]{flag}")
 
+    payload["stage_cache"] = stage_cache.stats()
+    stage_cache.close()
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
                         encoding="utf-8")
     print(f"\nwrote {args.out}")
+    if args.stage_cache is not None:
+        print(f"stage cache: {stage_cache.stats()}")
 
 
 if __name__ == "__main__":

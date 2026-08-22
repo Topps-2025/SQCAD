@@ -51,7 +51,7 @@ echo "   scp -P $CLOUD_PORT $WORK_DIR/scripts/cloud_phase1_experiments.sh $CLOUD
 echo ""
 echo "2. SSH 连接云端："
 echo "   ssh -p $CLOUD_PORT $CLOUD_USER@$CLOUD_HOST"
-echo "   密码: o4F9PfgQzTR8"
+echo "   密码: ${SQCAD_SSH_PASSWORD}"
 echo ""
 echo "3. 启动 Phase 1 实验："
 echo "   cd /root/autodl-tmp/sqcad_workspace/SQCAD"

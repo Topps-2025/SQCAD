@@ -34,3 +34,6 @@ remote_public_contract_cpu.json
 Thumbs.db
 .obsidian/
 tools/.autodl_pw
+
+# G-16: local-only SSH credential file (never commit)
+.ssh_password

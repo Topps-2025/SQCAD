@@ -59,6 +59,7 @@ from sqcad.public_unified_contract import (
     evaluate_trace, mask_lme_chronological, needed_free, run_policy,
     trace_features, write_locomo_qa_files,
 )
+from sqcad.stage_cache import StageCache
 from sqcad.trace_grounded_runner import (
     TOKEN_RE, load_locomo, load_longmemeval_s,
 )
@@ -78,7 +79,8 @@ class CountingLLMClient:
     """Wrapper around the official LLMClient: counts calls/chars and forces
     temperature 0 (greedy decoding, reproducibility)."""
 
-    def __init__(self, client) -> None:
+    def __init__(self, client, model: str = "",
+                 cache: "StageCache | None" = None) -> None:
         self._c = client
         # Capture the ORIGINAL bound methods BEFORE the make_system patch
         # replaces them on the instance -- calling self._c.chat_completion
@@ -88,10 +90,30 @@ class CountingLLMClient:
         self.calls = 0
         self.in_chars = 0
         self.out_chars = 0
+        self.cache_hits = 0
+        self._model = model
+        self._cache = cache
         self._lock = threading.Lock()
 
     def chat_completion(self, messages, temperature=0.2,
                         response_format=None, max_retries=3) -> str:
+        ck = None
+        if self._cache is not None:
+            # Forced temperature 0 below makes each reply a pure function of
+            # its message list, so the whole list is the content key (the
+            # official pipeline varies the system message per component).
+            ck = StageCache.key(
+                self._model,
+                json.dumps([[m.get("role", ""), m.get("content", "")]
+                            for m in messages], ensure_ascii=False),
+                str(response_format))
+            hit = self._cache.get(ck)
+            if hit is not None:
+                # Resumed generation, not a new one: kept out of the cost
+                # counters and reported separately (G-13, 56-).
+                with self._lock:
+                    self.cache_hits += 1
+                return hit
         with self._lock:
             self.calls += 1
             self.in_chars += sum(len(m.get("content", "")) for m in messages)
@@ -100,6 +122,8 @@ class CountingLLMClient:
             max_retries=max_retries)
         with self._lock:
             self.out_chars += len(out)
+        if ck is not None:
+            self._cache.put(ck, out)
         return out
 
     def extract_json(self, text: str):
@@ -192,8 +216,8 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
 
     per: Dict[str, List[dict]] = {r: [] for r in ROWS}
     qa_pairs: List[Tuple[object, PolicyResult]] = []
-    llm_usage = {"calls": 0, "in_chars": 0, "out_chars": 0}
-    _calls = _in_chars = _out_chars = 0
+    llm_usage = {"calls": 0, "in_chars": 0, "out_chars": 0, "cache_hits": 0}
+    _calls = _in_chars = _out_chars = _cache_hits = 0
 
     for trace in traces:
         masked, _ = (mask_lme_chronological(trace)
@@ -223,9 +247,15 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
         _calls += system.llm_client.calls
         _in_chars += system.llm_client.in_chars
         _out_chars += system.llm_client.out_chars
+        _cache_hits += getattr(system.llm_client, "cache_hits", 0)
 
     llm_usage = {"calls": _calls, "in_chars": _in_chars,
-                 "out_chars": _out_chars}
+                 "out_chars": _out_chars, "cache_hits": _cache_hits,
+                 "cache_hits_note": (
+                     "generations served from the stage cache on a resumed "
+                     "run; excluded from calls/chars, so `calls` is fresh "
+                     "generation only and a resumed total is not comparable "
+                     "to a single-shot run's cost (G-13, 56-)")}
 
     if qa_out is not None and qa_pairs:
         write_locomo_qa_files(qa_pairs, qa_meta, qa_out)
@@ -274,7 +304,16 @@ def main() -> None:
     ap.add_argument("--only", choices=("longmemeval_s", "locomo"), default=None)
     ap.add_argument("--max-traces", type=int, default=None)
     ap.add_argument("--db-dir", type=Path, default=Path("results/simplemem_db"))
+    ap.add_argument("--stage-cache", type=Path, default=None,
+                    help="append-only JSONL cache of completed LLM replies, "
+                         "keyed by message content. Pass the same path to "
+                         "resume: prompts already answered are served from "
+                         "disk instead of regenerated, so a crash mid-trace "
+                         "does not discard generation already paid for "
+                         "(G-13). Cached replies are reported as "
+                         "llm_usage.cache_hits, never as fresh calls.")
     args = ap.parse_args()
+    stage_cache = StageCache(args.stage_cache)
 
     # Import official SimpleMem (needs config.py in the snapshot root);
     # config.py is the pristine example file: attribute edits below are
@@ -393,7 +432,8 @@ def main() -> None:
         # this instance per main.py) -- the CountingLLMClient captures the
         # original bound methods so the instance patch below does not
         # recurse.
-        wrapped = CountingLLMClient(system.llm_client)
+        wrapped = CountingLLMClient(system.llm_client, model=args.llm_model,
+                                    cache=stage_cache)
         # Disable Qwen3 thinking at the request layer (see patch_no_think)
         patch_no_think(system.llm_client)
         # route every official LLM call through the counter (single

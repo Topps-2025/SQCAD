@@ -38,7 +38,7 @@ echo ""
 # 步骤 2: 连接云端并启动实验
 echo "步骤 2: 连接云端..."
 echo "SSH 命令: ssh -p $CLOUD_PORT $CLOUD_USER@$CLOUD_HOST"
-echo "密码: o4F9PfgQzTR8"
+echo "密码: ${SQCAD_SSH_PASSWORD}"
 echo ""
 
 echo "========================================="
@@ -65,5 +65,5 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 else
     echo ""
     echo "稍后手动连接: ssh -p $CLOUD_PORT $CLOUD_USER@$CLOUD_HOST"
-    echo "密码: o4F9PfgQzTR8"
+    echo "密码: ${SQCAD_SSH_PASSWORD}"
 fi
