@@ -2,7 +2,7 @@
 
 T2 (Theorem 2, strict reduction-separation):
   * pairing identity: Regret_K(pi) + Regret_A(pi) = tau*p*(T - n_early) exactly
-    for ANY policy (Lemma 4 in 16-) -- the engine of the impossibility proof;
+    for the coupled censored-committed policies used by the reduction proof;
   * reduction image: standard learners (UCB, contextual bandit, log OPE)
     consuming only phi(obs) -- the image under a faithful feedback-preserving
     reduction -- accrue exact linear regret on the W2 pair (Theta(T));
@@ -12,19 +12,21 @@ T2 (Theorem 2, strict reduction-separation):
     on the phi constraint (16- 1.5-1.6).
 
 P4 (Theorems 3-4, minimax probe lower bound):
-  * detection sweep: N*(delta) = log(1/delta)/KL (KL = 2 tau^2 / sigma^2) vs
+  * detection sweep: exact symmetric-Gaussian fixed-sample N*(delta) =
+    ceil((sigma Phi^-1(1-delta)/tau)^2) vs
     empirical probes-to-decision of the CI-exclusion rule under the probe
-    channel (attempt rate q, success rho) -- E[N]/N* bounded by a constant in
-    the binding regime (16- 2.2);
+    channel (attempt rate q, success rho) -- E[N]/N* is inspected as an
+    order/constant-factor diagnostic in the binding regime (16- 2.2);
   * regret decomposition: total regret = probe cost + restore wait (lifecycle
-    loss) + wrong-governance loss; empirical E[Regret_K] vs the lower bound
-    L = (N*/rho)(tau*p/q + c_probe) and vs the T1(b) upper
-    U = (tau*p + c_probe)/(q*rho) + c_restore -- order-matching with a
-    constant factor (16- 2.3-2.4).
+    loss) + wrong-governance loss.  The strict finite-horizon comparison uses
+    the truncated survival-sum lifecycle lower bound; the historical
+    L=(N*/rho)(tau*p/q+c_probe) is retained only as an infinite-horizon
+    diagnostic.  U_cons is likewise a conservative diagnostic envelope.
 """
 
 import math
 import random
+from statistics import NormalDist
 from typing import Any, Dict, List, Sequence, Tuple
 
 from sqcad.self_obscuring_ablation import (
@@ -54,10 +56,12 @@ def _mean_of_sum(slopes_a: Sequence[float],
 
 def pairing_identity(n_seeds: int = 12, seed0: int = 21,
                      horizon: int = HORIZON) -> Dict[str, Any]:
-    """Lemma 4 (16- 1.4): for ANY policy the paired regret sums to the
-    constant tau*p*(T - n_early), pointwise per seed.  Checked on the
-    watchful/committed policies and on a random-flip policy (maximally
-    adaptive, provably irrelevant to the identity)."""
+    """Check the paired identity on the coupled policies used here.
+
+    The formal reduction theorem is restricted to the fully censored,
+    committed/no-restore subclass.  ``random_flip`` is retained as a coupled
+    implementation control, not as evidence for an arbitrary-policy theorem.
+    """
     policies = ("watchful_no_restore", "association_commit",
                 "watchful_restore", "random_flip")
     out: Dict[str, Any] = {}
@@ -126,9 +130,60 @@ DELTA = 0.05
 
 def _n_star(tau: float, sigma: float = 1.0,
             delta: float = DELTA) -> float:
-    """Theorem 3 lower bound: log(1/delta)/KL, KL = 2 tau^2 / sigma^2."""
+    """Exact integer threshold for the symmetric Gaussian fixed-sample test.
+
+    For ``N(+tau, sigma^2)`` versus ``N(-tau, sigma^2)``, the likelihood-ratio
+    test has maximal error ``Phi(-|tau|*sqrt(n)/sigma)``.  This is a
+    fixed-sample threshold only; it makes no claim about arbitrary sequential
+    stopping rules or their coverage.
+    """
+    if not 0.0 < delta < 0.5:
+        raise ValueError("delta must lie in (0, 0.5) for the two-point bound")
+    if tau == 0.0 or sigma <= 0.0:
+        raise ValueError("tau must be nonzero and sigma positive")
+    z = NormalDist().inv_cdf(1.0 - delta)
+    return float(math.ceil((sigma * z / abs(tau)) ** 2))
+
+
+def _bh_n_lower(tau: float, sigma: float = 1.0,
+                delta: float = DELTA) -> float:
+    """Generic Bretagnolle--Huber/Le Cam weak lower bound.
+
+    This bound is distribution-agnostic and is intentionally weaker than the
+    exact Gaussian threshold used by ``_n_star``.
+    """
+    if not 0.0 < delta < 0.5:
+        raise ValueError("delta must lie in (0, 0.5) for the two-point bound")
+    if tau == 0.0 or sigma <= 0.0:
+        raise ValueError("tau must be nonzero and sigma positive")
     kl = 2.0 * tau ** 2 / (sigma ** 2)
-    return math.log(1.0 / delta) / kl
+    return math.log(1.0 / (4.0 * delta)) / kl
+
+
+def _finite_lifecycle_lower(n: int, success_prob: float,
+                            horizon: int) -> float:
+    """Survival-sum lower bound for a finite-horizon N-success wait.
+
+    The bound is E[min(S_N, H)] for iid Bernoulli(success_prob) trials.
+    It is the finite-horizon replacement for the untruncated N/success_prob
+    expression; no probe-cost lower bound is implied when the horizon ends
+    before N successes are collected.
+    """
+    if n < 1 or horizon < 0 or not 0.0 <= success_prob <= 1.0:
+        raise ValueError("invalid finite-horizon negative-binomial parameters")
+    # Distribution of the number of successes after the current step,
+    # capped at n.  The CDF at n-1 is the survival probability for S_N.
+    mass = [0.0] * (n + 1)
+    mass[0] = 1.0
+    total = 0.0
+    for _ in range(horizon):
+        total += sum(mass[:n])
+        nxt = [0.0] * (n + 1)
+        for successes, prob in enumerate(mass):
+            nxt[successes] += prob * (1.0 - success_prob)
+            nxt[min(n, successes + 1)] += prob * success_prob
+        mass = nxt
+    return total
 
 
 def _ci_stop_trial(tau_true: float, q: float, rho: float, sigma: float,
@@ -162,9 +217,11 @@ def detection_bound_sweep(taus: Sequence[float] = TAUS,
     """Theorems 3-4 + Corollary 4 (16- 2.2-2.4): per (tau, q), N*(delta) vs
     empirical probes-to-decision and the regret decomposition
     E[Regret_K] = c_probe*attempts + tau*p*steps (lifecycle loss while the
-    wrong archive persists), compared against the lower bound
-    L = (N*/rho)(tau*p/q + c_probe) and the T1(b) upper bound
-    U = (tau*p + c_probe)/(q*rho) + c_restore."""
+    wrong archive persists), compared against the finite-horizon truncated
+    lifecycle lower bound and the asymptotic diagnostic
+    L_inf = (N*/rho)(tau*p/q + c_probe).  U_cons is a conservative diagnostic
+    envelope; the exact Bernoulli-model upper is
+    tau*p/(q*rho) + c_probe/rho + c_restore."""
     sigma = 1.0
     rho = 1.0
     tau_p = TAU * P_EXPOSE
@@ -186,7 +243,9 @@ def detection_bound_sweep(taus: Sequence[float] = TAUS,
             e_steps = _mean(steps_l)
             e_att = _mean(attempts_l)
             regret_k = c_probe * e_att + tau_p * e_steps
-            lower = (n_star / rho) * (tau_p / q + c_probe)
+            finite_lifecycle_lower = tau_p * _finite_lifecycle_lower(
+                int(n_star), q * rho, int(HORIZON - N_EARLY))
+            lower_asymptotic = (n_star / rho) * (tau_p / q + c_probe)
             upper = (tau_p + c_probe) / (q * rho) + c_restore
             row[f"q_{q}"] = {
                 "empirical_steps": e_steps,
@@ -194,10 +253,14 @@ def detection_bound_sweep(taus: Sequence[float] = TAUS,
                 "probe_ratio_E_over_Nstar": e_att / n_star if n_star > 0.01
                 else None,
                 "regret_K": regret_k,
-                "lower_bound_L": lower,
+                "lower_bound_L": lower_asymptotic,
+                "lower_bound_finite_lifecycle": finite_lifecycle_lower,
                 "upper_bound_U": upper,
-                "regret_over_L": regret_k / lower,
-                "U_over_L": upper / lower,
+                "regret_over_L": regret_k / lower_asymptotic,
+                "regret_over_finite_lifecycle_lower": (
+                    regret_k / finite_lifecycle_lower
+                    if finite_lifecycle_lower > 0.0 else None),
+                "U_over_L": upper / lower_asymptotic,
                 "decomposition": {
                     "probe_cost": c_probe * e_att,
                     "restore_wait_lifecycle": tau_p * e_steps,

@@ -22,9 +22,10 @@ P3 self_confirming: no-exploration -> linear regret (self-confirming
     unidentifiability: a wrongly archived memory never re-enters the
     evidence stream); budgeted probing -> regret plateaus after
     evidence-driven restoration.
-P4 probe_complexity: KL lower bound N >= log(1/delta)/KL(P1||P2) vs
-    SQCAD-style stopping rule (probe until the CI excludes 0): empirical
-    mean probe count matches the lower bound up to a constant factor.
+P4 probe_complexity: exact equal-variance Gaussian fixed-sample threshold
+    versus the SQCAD-style stopping rule (probe until the CI excludes 0).
+    The sequential stopping experiment is reported as an order comparison,
+    not as attainment of the fixed-sample constant.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ import argparse
 import json
 import math
 import random
-from statistics import mean, pstdev
+from statistics import NormalDist, mean, pstdev
 from typing import Any, Dict, List, Tuple
 
 
@@ -288,13 +289,20 @@ def self_confirming_regret(tau: float = 10.0, p_value: float = 0.6,
 def probe_complexity(mu1: float = 0.3, mu2: float = -0.5, sigma: float = 1.0,
                      delta: float = 0.05, n_seeds: int = 200,
                      seed0: int = 3) -> Dict[str, Any]:
-    """Two worlds: probes ~ N(mu1, sigma^2) (keep-optimal) vs
-    N(mu2, sigma^2) (archive-optimal), mu2 < 0 < mu1.  Lower bound:
-    N >= log(1/delta)/KL, KL = (mu1-mu2)^2/(2 sigma^2).  Upper: the
-    SQCAD-style stopping rule -- probe until mean - z*sigma/sqrt(n) > 0
-    (CI excludes 0) -- simulated in the keep-optimal world."""
-    kl = (mu1 - mu2) ** 2 / (2.0 * sigma ** 2)
-    lower = math.log(1.0 / delta) / kl
+    """Two equal-variance Gaussian worlds and an exact fixed-sample threshold.
+
+    The midpoint likelihood-ratio test has maximal error
+    ``Phi(-|mu1-mu2|*sqrt(n)/(2*sigma))``.  The SQCAD-style CI rule is
+    sequential and is compared with this integer threshold only in order.
+    """
+    if not 0.0 < delta < 0.5:
+        raise ValueError("delta must lie in (0, 0.5) for the two-point bound")
+    if sigma <= 0.0 or mu1 <= mu2:
+        raise ValueError("require sigma > 0 and mu1 > mu2")
+    gap = abs(mu1 - mu2)
+    z_exact = NormalDist().inv_cdf(1.0 - delta)
+    kl = gap ** 2 / (2.0 * sigma ** 2)
+    lower = float(math.ceil((2.0 * sigma * z_exact / gap) ** 2))
     z = 1.96
     stops: List[int] = []
     errors = 0
@@ -312,13 +320,14 @@ def probe_complexity(mu1: float = 0.3, mu2: float = -0.5, sigma: float = 1.0,
             errors += 1
     return {"mu1": mu1, "mu2": mu2, "sigma": sigma, "delta": delta,
             "kl": kl, "lower_bound": lower,
+            "lower_bound_kind": "exact_equal_variance_gaussian",
             "empirical_mean_stop": mean(stops),
             "empirical_p90_stop": sorted(stops)[int(0.9 * n_seeds)],
             "ratio_mean_over_lower": mean(stops) / lower,
             "failure_to_commit_rate": errors / n_seeds,
-            "note": "O(log(1/delta)/Delta^2) upper matches the KL lower "
-                    "bound up to a constant factor in the Gaussian "
-                    "instance"}
+            "note": "O(log(1/delta)/Delta^2) upper matches the fixed-sample "
+                    "KL lower bound in order; the sequential stopping rule "
+                    "is not claimed to attain its exact constant."}
 
 
 # ---------------------------------------------------------------------------

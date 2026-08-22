@@ -48,9 +48,12 @@ Usage (cloud, PYTHONPATH=src):
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 import math
+import os
 import sys
+import threading
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
@@ -112,18 +115,34 @@ class VLLMClient:
         self.calls = 0
         self.in_chars = 0
         self.out_chars = 0
+        self._lock = threading.Lock()
 
     def chat(self, system: str, user: str) -> str:
-        self.calls += 1
-        self.in_chars += len(system) + len(user)
+        with self._lock:
+            self.calls += 1
+            self.in_chars += len(system) + len(user)
         r = self._c.chat.completions.create(
             model=self.model,
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": user}],
-            temperature=0, max_tokens=1024)
+            temperature=0, max_tokens=512,
+            # Qwen3's default reasoning block is not part of the paper's
+            # JSON/text interface.  This is the same open-weight adapter
+            # used by the SimpleMem reproduction; it does not alter the
+            # ActMem mechanism being evaluated.
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}})
         text = r.choices[0].message.content or ""
-        self.out_chars += len(text)
+        with self._lock:
+            self.out_chars += len(text)
         return text
+
+    def chat_many(self, system: str, users: Sequence[str],
+                  max_workers: int = 8) -> List[str]:
+        """Submit independent prompts concurrently; preserve input order."""
+        if not users:
+            return []
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(users))) as ex:
+            return list(ex.map(lambda u: self.chat(system, u), users))
 
     def extract_json(self, text: str):
         """Robust JSON extraction (mirrors the SimpleMem official parser)."""
@@ -167,28 +186,26 @@ class PMIValidator:
     def _nll(self, texts: List[str]) -> List[float]:
         import torch
         outs: List[float] = []
-        batch = 16
+        batch = 64
         for i in range(0, len(texts), batch):
             chunk = texts[i:i + batch]
             enc = self.tok(chunk, return_tensors="pt", padding=True,
-                           truncation=True, max_length=512)
+                           truncation=True, max_length=256)
             ids = enc["input_ids"].to(self.device)
             attn = enc["attention_mask"].to(self.device)
             with torch.no_grad():
                 logits = self.model(input_ids=ids, attention_mask=attn,
                                     labels=ids).logits
-            # per-token NLL over non-pad tokens
-            for b in range(len(chunk)):
-                keep = attn[b].bool()
-                nll = 0.0
-                n = 0
-                logp = torch.log_softmax(logits[b, :-1].float(), dim=-1)
-                for t in range(logp.shape[0]):
-                    if not keep[t + 1]:
-                        continue
-                    nll -= logp[t, ids[b, t + 1]].item()
-                    n += 1
-                outs.append(nll / max(n, 1))
+            # Per-token NLL over non-pad tokens.  This is algebraically the
+            # same masked mean as the scalar reference, but vectorized so a
+            # large causal-edge batch does not spend minutes in Python loops.
+            logp = torch.log_softmax(logits[:, :-1].float(), dim=-1)
+            target = ids[:, 1:]
+            token_nll = -logp.gather(-1, target.unsqueeze(-1)).squeeze(-1)
+            mask = attn[:, 1:].float()
+            sums = (token_nll * mask).sum(dim=1)
+            counts = mask.sum(dim=1).clamp_min(1.0)
+            outs.extend((sums / counts).detach().cpu().tolist())
         return outs
 
     def pmi(self, pairs: List[Tuple[str, str]]) -> List[float]:
@@ -259,11 +276,12 @@ def run_actmem_trace(msgs, tasks, llm: VLLMClient, emb: EmbeddingModel,
 
     # 3.1 fact extraction per user+assistant turn pair (chronological)
     facts: List[dict] = []  # {text, msg_id, vec}
-    for m in msgs:
-        text = f"[{m.role}] {m.content}"
-        raw = llm.extract_json(llm.chat(
-            "You extract atomic facts from dialogue turns.",
-            P_EXTRACT.format(text=text)))
+    extract_prompts = [P_EXTRACT.format(text=f"[{m.role}] {m.content}")
+                       for m in msgs]
+    extract_outputs = llm.chat_many(
+        "You extract atomic facts from dialogue turns.", extract_prompts)
+    for m, output in zip(msgs, extract_outputs):
+        raw = llm.extract_json(output)
         if not isinstance(raw, list):
             continue
         for f in raw:
@@ -299,14 +317,19 @@ def run_actmem_trace(msgs, tasks, llm: VLLMClient, emb: EmbeddingModel,
 
     # 3.3 causal edges: LLM candidates + PMI validation
     causal: List[Tuple[str, str]] = []
+    causal_prompts: List[Tuple[List[dict], str]] = []
     for c in clusters:
         if len(c) < 2:
             continue
         texts = [f["text"] for f in c]
-        idx_pairs = llm.extract_json(llm.chat(
-            "You identify causal dependencies between facts.",
-            P_CAUSE.format(facts="\n".join(
-                f"{i + 1}. {t}" for i, t in enumerate(texts)))))
+        causal_prompts.append((c, P_CAUSE.format(facts="\n".join(
+            f"{i + 1}. {t}" for i, t in enumerate(texts)))))
+    causal_outputs = llm.chat_many(
+        "You identify causal dependencies between facts",
+        [p for _, p in causal_prompts])
+    for (c, _), causal_output in zip(causal_prompts, causal_outputs):
+        texts = [f["text"] for f in c]
+        idx_pairs = llm.extract_json(causal_output)
         cands: List[Tuple[str, str]] = []
         if isinstance(idx_pairs, list):
             for p in idx_pairs:
@@ -336,6 +359,8 @@ def run_actmem_trace(msgs, tasks, llm: VLLMClient, emb: EmbeddingModel,
 
     # 3.4 counterfactual retrieval per task
     ws: Dict[str, Tuple[str, ...]] = {}
+    counter_prompts = []
+    task_ranked: List[Tuple[object, List[dict]]] = []
     for t in tasks:
         qv = emb.encode([t.question])[0]
         ranked = sorted(facts, key=lambda f: cos(f["vec"], qv),
@@ -344,10 +369,13 @@ def run_actmem_trace(msgs, tasks, llm: VLLMClient, emb: EmbeddingModel,
         if not vinit:
             ws[t.task_id] = ()
             continue
-        kcs = llm.chat(
-            "You reason about consequences.",
-            P_COUNTER.format(query=t.question, facts="\n".join(
-                f"- {f['text']}" for f in vinit))).strip()
+        task_ranked.append((t, vinit))
+        counter_prompts.append(P_COUNTER.format(query=t.question, facts="\n".join(
+            f"- {f['text']}" for f in vinit)))
+    counter_outputs = llm.chat_many("You reason about consequences.",
+                                    counter_prompts)
+    for (t, vinit), counter_output in zip(task_ranked, counter_outputs):
+        kcs = counter_output.strip()
         kcv = emb.encode([kcs])[0]
         ranked2 = sorted(facts, key=lambda f: cos(f["vec"], kcv),
                          reverse=True)
@@ -370,8 +398,35 @@ def run_actmem_trace(msgs, tasks, llm: VLLMClient, emb: EmbeddingModel,
     return res, stats
 
 
+def _atomic_json(path: Path, payload: dict) -> None:
+    """Write a resumable artifact without leaving a truncated JSON file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False),
+                   encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _dataset_payload(name: str, per: Dict[str, List[dict]], stats_tot: dict,
+                     cfg: dict, status: str, n_seen: int,
+                     n_total: int) -> dict:
+    out: dict = {"status": status, "n_traces_seen": n_seen,
+                 "n_traces_total": n_total, "n_traces": len(per["sqcad"]),
+                 "rows": {}, "stats": stats_tot,
+                 "llm_usage": {"calls": cfg["llm"].calls,
+                               "in_chars": cfg["llm"].in_chars,
+                               "out_chars": cfg["llm"].out_chars}}
+    for row, evals in per.items():
+        if not evals:
+            continue
+        out["rows"][row] = {"aggregate": aggregate(row, evals)}
+        for m in METRICS:
+            out["rows"][row][m] = [e[m] for e in evals if e[m] is not None]
+    return out
+
+
 def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
-                max_traces: int | None) -> dict:
+                max_traces: int | None, checkpoint: Path | None = None) -> dict:
     traces = (load_longmemeval_s(data_path)
               if name == "longmemeval_s" else load_locomo(data_path))
     if max_traces is not None:
@@ -383,7 +438,8 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
     stats_tot = {"facts": 0, "clusters": 0, "causal_candidates": 0,
                  "causal_edges": 0, "semantic_edges": 0}
 
-    for trace in traces:
+    n_total = len(traces)
+    for trace_idx, trace in enumerate(traces, start=1):
         masked, _ = (mask_lme_chronological(trace)
                      if name == "longmemeval_s" else (trace, {}))
         visible_ids = {m.msg_id for m in masked.msgs}
@@ -406,19 +462,20 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
             if name == "locomo" and qa_out is not None:
                 qa_pairs.append((trace, r))
 
+        if checkpoint is not None:
+            _atomic_json(checkpoint, {
+                "dataset": name,
+                "source": str(data_path),
+                "completed_trace_index": trace_idx,
+                "partial": _dataset_payload(name, per, stats_tot, cfg,
+                                             "running", trace_idx, n_total),
+            })
+
     if qa_out is not None and qa_pairs:
         write_locomo_qa_files(qa_pairs, qa_meta, qa_out)
 
-    out: dict = {"n_traces": len(per["sqcad"]), "rows": {}, "stats": stats_tot,
-                 "llm_usage": {"calls": cfg["llm"].calls,
-                               "in_chars": cfg["llm"].in_chars,
-                               "out_chars": cfg["llm"].out_chars}}
-    for row, evals in per.items():
-        if not evals:
-            continue
-        out["rows"][row] = {"aggregate": aggregate(row, evals)}
-        for m in METRICS:
-            out["rows"][row][m] = [e[m] for e in evals if e[m] is not None]
+    out = _dataset_payload(name, per, stats_tot, cfg, "complete",
+                           n_total, n_total)
     out["significance_vs_sqcad"] = {}
     for row in ("actmem",):
         if row not in out["rows"]:
@@ -453,6 +510,8 @@ def main() -> None:
     ap.add_argument("--pmi-model", default="Qwen/Qwen3-0.6B")
     ap.add_argument("--qa-out-dir", type=Path, default=None)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--checkpoint-dir", type=Path, default=None,
+                     help="write an atomic per-trace checkpoint under this directory")
     ap.add_argument("--only", choices=("longmemeval_s", "locomo"), default=None)
     ap.add_argument("--max-traces", type=int, default=None)
     ap.add_argument("--tau-cluster", type=float, default=0.75)
@@ -482,6 +541,8 @@ def main() -> None:
                          "messages of retrieved facts; storage = fact "
                          "tokens (no eviction; lifecycle by construction 0)"),
             "llm_base_url": args.llm_base_url, "llm_model": args.llm_model,
+            "llm_adapter": {"temperature": 0, "max_tokens": 512,
+                            "enable_thinking": False},
             "embedding_model": args.embedding_model,
             "embedding_model_note": (
                 "paper: Qwen3-Embedding-8B; this row: 0.6B (8B weights "
@@ -490,6 +551,8 @@ def main() -> None:
                 "33- tier-B dense row, a negative scale result -- Eq. 2 "
                 "mechanism unchanged)"),
             "pmi_model": args.pmi_model,
+            "pmi_adapter": {"batch_size": 64, "max_length": 256,
+                            "pooling": "masked-token-NLL"},
             "tau_cluster": args.tau_cluster, "tau_sem": args.tau_sem,
             "tau_pmi": args.tau_pmi, "top_k": args.top_k,
             "n_boot": N_BOOT, "alpha": 0.05, "method": "studentized",
@@ -504,8 +567,10 @@ def main() -> None:
         if args.only is not None and name != args.only:
             continue
         qa_out = (args.qa_out_dir / name) if args.qa_out_dir else None
+        checkpoint = ((args.checkpoint_dir / f"{name}.checkpoint.json")
+                      if args.checkpoint_dir else None)
         payload["datasets"][name] = run_dataset(name, path, cfg, qa_out,
-                                                args.max_traces)
+                                                args.max_traces, checkpoint)
         print(f"== {name} ==")
         for row, r in payload["datasets"][name]["rows"].items():
             print(f"  {row:8s} {r['aggregate']}")

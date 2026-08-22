@@ -19,11 +19,13 @@ Design boundary
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Iterable, Mapping, Optional, Tuple
+from typing import Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
 from .decision_identification_theory import r_star
+from .safe_recovery_theory import anytime_boundary
 
 
 class QualificationStatus(str, Enum):
@@ -108,6 +110,128 @@ class QualificationCertificate:
         if self.upper < 0.0:
             return PersistentAction.ARCHIVE
         return None
+
+
+def anytime_qualification_certificate(
+        memory_id: str,
+        scope: ScopeKey,
+        observations: Sequence[float],
+        *,
+        sigma: float,
+        alpha: float,
+        evidence_ids: Tuple[str, ...] = (),
+        ) -> QualificationCertificate:
+    """Build the Theorem-13 anytime certificate from successful probes.
+
+    The returned interval is auditable and conservative: a persistent action
+    is authorized only when the confidence interval is strictly on one side
+    of zero.  A crossing interval remains ``UNRESOLVED``; callers may append a
+    later successful-probe observation and call this function again.  This is
+    deliberately a pure function so the stopping rule cannot silently use
+    failed-probe counts as statistical samples.
+    """
+    if sigma <= 0.0 or not 0.0 < alpha < 1.0:
+        raise ValueError("sigma must be positive and alpha must lie in (0, 1)")
+    values = tuple(float(x) for x in observations)
+    if not all(math.isfinite(x) for x in values):
+        raise ValueError("observations must be finite real numbers")
+    if not values:
+        return QualificationCertificate(
+            memory_id, scope, QualificationStatus.UNRESOLVED, None, None,
+            evidence_ids=evidence_ids,
+            diagnostics=("n=0", f"alpha={alpha:g}"),
+        )
+    n = len(values)
+    mean = sum(values) / n
+    radius = anytime_boundary(n, sigma, alpha)
+    lower, upper = mean - radius, mean + radius
+    status = QualificationStatus.BOUND
+    if lower <= 0.0 <= upper:
+        status = QualificationStatus.UNRESOLVED
+    return QualificationCertificate(
+        memory_id, scope, status, lower, upper,
+        evidence_ids=evidence_ids,
+        diagnostics=(f"n={n}", f"sigma={sigma:g}", f"alpha={alpha:g}",
+                     f"radius={radius:.12g}"),
+    )
+
+
+@dataclass
+class SequentialQualificationGate:
+    """Stateful terminal wrapper for the Theorem-13 certificate gate.
+
+    The pure ``anytime_qualification_certificate`` function is convenient for
+    replay, but it cannot by itself enforce the Safe-class lifecycle rule that
+    no probe is accepted after terminal keep/archive.  This wrapper enforces
+    that rule and makes horizon close explicit.  It does not estimate ``sigma``,
+    ``rho`` or the attempt rate; those remain caller-supplied contract fields.
+    """
+
+    memory_id: str
+    scope: ScopeKey
+    sigma: float
+    alpha: float
+    evidence_ids: Tuple[str, ...] = ()
+    _observations: Tuple[float, ...] = field(default_factory=tuple, init=False,
+                                             repr=False)
+    _evidence_trace: Tuple[str, ...] = field(default_factory=tuple, init=False,
+                                               repr=False)
+    _certificate: Optional[QualificationCertificate] = field(
+        default=None, init=False, repr=False)
+    _terminal_action: Optional[PersistentAction] = field(
+        default=None, init=False, repr=False)
+    _closed: bool = field(default=False, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.sigma <= 0.0 or not 0.0 < self.alpha < 1.0:
+            raise ValueError("sigma must be positive and alpha must lie in (0, 1)")
+        self._evidence_trace = tuple(self.evidence_ids)
+
+    @property
+    def observations(self) -> Tuple[float, ...]:
+        return self._observations
+
+    @property
+    def certificate(self) -> QualificationCertificate:
+        if self._certificate is None:
+            return anytime_qualification_certificate(
+                self.memory_id, self.scope, (), sigma=self.sigma,
+                alpha=self.alpha, evidence_ids=self.evidence_ids)
+        return self._certificate
+
+    @property
+    def terminal_action(self) -> Optional[PersistentAction]:
+        return self._terminal_action
+
+    @property
+    def is_terminal(self) -> bool:
+        return self._closed or self._terminal_action is not None
+
+    def observe(self, value: float,
+                evidence_id: Optional[str] = None) -> QualificationCertificate:
+        """Append one successful-probe observation before terminal close."""
+        if self.is_terminal:
+            raise RuntimeError("terminal qualification gate rejects new probes")
+        value = float(value)
+        if not math.isfinite(value):
+            raise ValueError("observations must be finite real numbers")
+        self._observations = self._observations + (value,)
+        ids = self._evidence_trace
+        if evidence_id is not None:
+            ids = ids + (str(evidence_id),)
+        self._evidence_trace = ids
+        self._certificate = anytime_qualification_certificate(
+            self.memory_id, self.scope, self._observations,
+            sigma=self.sigma, alpha=self.alpha, evidence_ids=ids)
+        action = self._certificate.authorized_action()
+        if action in (PersistentAction.KEEP, PersistentAction.ARCHIVE):
+            self._terminal_action = action
+        return self._certificate
+
+    def close_horizon(self) -> QualificationCertificate:
+        """Stop probing at horizon; unresolved evidence remains non-authorizing."""
+        self._closed = True
+        return self.certificate
 
 
 @dataclass(frozen=True)

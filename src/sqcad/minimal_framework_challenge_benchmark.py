@@ -30,6 +30,11 @@ from pathlib import Path
 from statistics import NormalDist, mean, stdev
 from typing import Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
+try:  # package execution
+    from sqcad.bootstrap_ci import paired_seed_ci
+except ImportError:  # direct module loading in the challenge tests
+    from bootstrap_ci import paired_seed_ci
+
 
 ROOT = Path(__file__).resolve().parent
 BASE_PATH = ROOT / "lifecycle_restore_benchmark.py"
@@ -62,6 +67,7 @@ class PolicySpec:
     conditional_association: bool = False
     oracle_groups: bool = False
     no_memory: bool = False
+    sentinel_cost_gate: bool = False
 
 
 POLICY_SPECS: Tuple[PolicySpec, ...] = (
@@ -196,6 +202,18 @@ POLICY_SPECS: Tuple[PolicySpec, ...] = (
         conditional_association=True,
     ),
     PolicySpec(
+        "hierarchical_sentinel_guarded",
+        causal=True,
+        hierarchical=True,
+        adaptive_budget=False,
+        sentinel_correction=True,
+        decay_rule="risk",
+        recoverable=True,
+        restore_enabled=True,
+        conditional_association=True,
+        sentinel_cost_gate=True,
+    ),
+    PolicySpec(
         "oracle_structure_reference",
         causal=True,
         hierarchical=True,
@@ -221,6 +239,8 @@ RESTORE_FLOOR = 0.38
 PROBE_COST_WEIGHT = 0.10
 NORMAL = NormalDist()
 EVSI_Z_NODES = tuple(NORMAL.inv_cdf((index + 0.5) / 32.0) for index in range(32))
+BOOTSTRAP_SEEDS = (20260812, 20260817)
+BOOTSTRAP_REPLICATES = 2000
 
 
 @dataclass
@@ -801,7 +821,53 @@ def run_policy(world, spec: PolicySpec) -> Dict[str, object]:
                     ),
                     reverse=True,
                 )[:sentinel_count]
-                pool_ids.update(item.item_id for item in sentinels)
+                if not spec.sentinel_cost_gate:
+                    pool_ids.update(item.item_id for item in sentinels)
+                else:
+                    # Badcase repair: a group-level shortlist may be wrong,
+                    # but an unconditional item probe can cost more than the
+                    # recovery it enables.  Admit a sentinel only when its
+                    # one-step qualification EVSI exceeds the same priced
+                    # intervention cost used by the main probe stop rule.
+                    baseline_value = max(
+                        [0.0]
+                        + [
+                            conditional_association_value(
+                                association[item_id],
+                                task.semantic_scores[item_id],
+                                task.risk,
+                                items[item_id].execution_cost,
+                            )
+                            for item_id in pool_ids
+                        ]
+                    )
+                    sentinel_cost = world.scenario.intervention_cost_scale * 0.78
+                    for sentinel in sentinels:
+                        full_value = (
+                            association[sentinel.item_id]
+                            * task.semantic_scores[sentinel.item_id]
+                            - sentinel.execution_cost
+                        )
+                        fallback_value = conditional_association_value(
+                            association[sentinel.item_id],
+                            task.semantic_scores[sentinel.item_id],
+                            task.risk,
+                            sentinel.execution_cost,
+                        )
+                        evsi = qualification_evsi(
+                            item_belief[sentinel.item_id],
+                            world.scenario.observation_sd,
+                            max(1, len(active)),
+                            full_value,
+                            fallback_value,
+                            baseline_value,
+                        )
+                        # Sentinels are exploratory, not yet authorized item
+                        # probes; they must repay the full intervention price.
+                        # The main probe path may use the discounted utility
+                        # price only after its candidate contract is met.
+                        if evsi > sentinel_cost:
+                            pool_ids.add(sentinel.item_id)
             pool_ids.update(pending_revalidation)
             pool = [items[item_id] for item_id in pool_ids]
             probed_item_ids: set[str] = set()
@@ -1076,6 +1142,102 @@ def aggregate_seed(seed: int, scenario) -> List[Dict[str, object]]:
     return rows
 
 
+def build_triggered_world(seed: int = 0):
+    """Build a fixed semi-synthetic trace that exercises the latent modules.
+
+    The ordinary lifecycle generator is intentionally broad and often does
+    not make a particular module decision-relevant.  This trace is a separate
+    mechanism check: one target group contains a useful item and a harmful
+    hitchhiker, the regime reverses and then recurs, and task risk alternates
+    between low and high values.  No policy receives the latent effects.
+    """
+    rng = base.keyed_rng(seed, "semi-synthetic-mechanism-trigger")
+    items: List[object] = []
+    for group in range(4):
+        for index in range(2):
+            if group == 0 and index == 0:
+                phase0, phase1 = 2.0, -2.0
+            elif group == 0 and index == 1:
+                phase0, phase1 = 1.5, -1.5
+            else:
+                phase0 = phase1 = 0.20
+            # Small fixed perturbations create paired seeds without removing
+            # the intended sign pattern of the trace.
+            perturb = 0.03 * rng.gauss(0.0, 1.0)
+            items.append(
+                base.MemoryItem(
+                    item_id=f"trigger_seed{seed:04d}_g{group}_i{index}",
+                    true_group=group,
+                    observed_group=group,
+                    phase0_effect=phase0 + perturb,
+                    phase1_effect=phase1 + perturb,
+                    semantic_prior=0.0,
+                    association_prior=0.0,
+                    execution_cost=0.03,
+                )
+            )
+
+    semantic_scores = {
+        item.item_id: (
+            0.99 if item.true_group == 0 and item.item_id.endswith("i0")
+            else 0.92 if item.true_group == 0
+            else 0.05
+        )
+        for item in items
+    }
+    tasks = []
+    for episode in range(18):
+        phase = 0 if episode < 6 or episode >= 12 else 1
+        tasks.append(
+            base.Task(
+                task_id=f"semi_synthetic_trigger_seed{seed:04d}_episode{episode:04d}",
+                episode=episode,
+                phase=phase,
+                version=phase,
+                target_group=0,
+                risk=0.95 if episode % 2 == 0 else 0.10,
+                ambiguity=0.95 if episode % 2 == 0 else 0.05,
+                semantic_scores=semantic_scores,
+            )
+        )
+    scenario = replace(
+        base.SCENARIOS[0],
+        name="semi_synthetic_mechanism_trigger",
+        drift=True,
+        recurrence_probability=1.0,
+        confounding=0.0,
+        coherence=1.0,
+        decomposition_accuracy=1.0,
+        observation_sd=0.10,
+        intervention_cost_scale=2.5,
+        false_forgetting_weight=4.0,
+        horizon=18,
+        group_count=4,
+        items_per_group=2,
+        description="Fixed paired trace for recovery, adaptive-budget, and sentinel mechanism checks.",
+    )
+    stream_hash = base.stable_hash(
+        {"items": [asdict(item) for item in items], "tasks": [asdict(task) for task in tasks]}
+    )
+    return base.World(
+        seed=seed,
+        scenario=scenario,
+        recurrence=True,
+        drift_group=0,
+        items=tuple(items),
+        tasks=tuple(tasks),
+        stream_hash=stream_hash,
+    )
+
+
+def aggregate_triggered_seed(seed: int) -> List[Dict[str, object]]:
+    world = build_triggered_world(seed)
+    rows = [run_policy(world, spec) for spec in POLICY_SPECS]
+    if len({row["candidate_stream_sha256"] for row in rows}) != 1:
+        raise RuntimeError("triggered policies must share the same world stream")
+    return rows
+
+
 def metric_summary(values: Sequence[float]) -> Dict[str, object]:
     if not values:
         return {
@@ -1090,6 +1252,46 @@ def metric_summary(values: Sequence[float]) -> Dict[str, object]:
         "sd": sd,
         "ci95": 1.96 * sd / math.sqrt(len(values)) if len(values) > 1 else 0.0,
         "n": float(len(values)),
+    }
+
+
+def paired_studentized_summary(values: Sequence[float]) -> Dict[str, object]:
+    """Studentized CI over independent mechanism worlds (seed unit).
+
+    ``values`` are already paired policy differences from the same world
+    stream.  A single triggered world is retained as a diagnostic but is not
+    assigned a confidence interval, preventing the old n=1 artifact from
+    being mistaken for an inferential result.
+    """
+
+    xs = list(values)
+    if len(xs) < 2:
+        return {
+            "status": "insufficient_units",
+            "n_units": len(xs),
+            "mean": mean(xs) if xs else None,
+            "ci_low": None,
+            "ci_high": None,
+            "method": "studentized",
+            "n_boot": BOOTSTRAP_REPLICATES,
+        }
+    intervals = {
+        str(seed): paired_seed_ci(
+            xs,
+            n_boot=BOOTSTRAP_REPLICATES,
+            seed=seed,
+            alpha=0.05,
+            method="studentized",
+        )
+        for seed in BOOTSTRAP_SEEDS
+    }
+    return {
+        "status": "estimated",
+        "n_units": len(xs),
+        "mean": mean(xs),
+        "method": "studentized",
+        "n_boot": BOOTSTRAP_REPLICATES,
+        "intervals": intervals,
     }
 
 
@@ -1191,6 +1393,10 @@ def module_contrasts() -> Dict[str, Tuple[str, str]]:
             "hierarchical_candidate",
             "hierarchical_sentinel_candidate",
         ),
+        "sentinel_cost_gate": (
+            "hierarchical_sentinel_candidate",
+            "hierarchical_sentinel_guarded",
+        ),
         "risk_conditioned_decay": (
             "item_causal_fixed_recoverable",
             "minimal_framework",
@@ -1264,6 +1470,18 @@ def contrast_summary(
                 ): row
                 for row in selected
             }
+            for scenario_key, seed_key in keys:
+                before_stream = lookup[(scenario_key, seed_key, without)][
+                    "candidate_stream_sha256"
+                ]
+                after_stream = lookup[(scenario_key, seed_key, with_module)][
+                    "candidate_stream_sha256"
+                ]
+                if before_stream != after_stream:
+                    raise RuntimeError(
+                        "paired contrast requires identical candidate streams: "
+                        f"{scenario_key}/{seed_key}/{without}/{with_module}"
+                    )
             utility_delta = []
             regret_reduction = []
             harmful_reduction = []
@@ -1321,16 +1539,37 @@ def contrast_summary(
                 "without": without,
                 "with": with_module,
                 "utility_delta": metric_summary(utility_delta),
+                "utility_delta_paired_studentized": paired_studentized_summary(
+                    utility_delta
+                ),
                 "regret_reduction": metric_summary(regret_reduction),
+                "regret_reduction_paired_studentized": paired_studentized_summary(
+                    regret_reduction
+                ),
                 "harmful_selection_reduction": metric_summary(harmful_reduction),
+                "harmful_selection_reduction_paired_studentized": paired_studentized_summary(
+                    harmful_reduction
+                ),
                 "risk_weighted_harm_reduction": metric_summary(
+                    risk_weighted_harm_reduction
+                ),
+                "risk_weighted_harm_reduction_paired_studentized": paired_studentized_summary(
                     risk_weighted_harm_reduction
                 ),
                 "false_forgetting_regret_reduction": metric_summary(
                     false_forgetting_regret_reduction
                 ),
+                "false_forgetting_regret_reduction_paired_studentized": paired_studentized_summary(
+                    false_forgetting_regret_reduction
+                ),
                 "active_fraction_reduction": metric_summary(active_fraction_reduction),
+                "active_fraction_reduction_paired_studentized": paired_studentized_summary(
+                    active_fraction_reduction
+                ),
                 "probe_cost_change": metric_summary(probe_cost_change),
+                "probe_cost_change_paired_studentized": paired_studentized_summary(
+                    probe_cost_change
+                ),
                 "zero_probe_price_utility_delta": metric_summary(
                     zero_probe_price_utility_delta
                 ),
@@ -1340,6 +1579,12 @@ def contrast_summary(
                     else None
                 ),
                 "restore_rate_change": metric_summary(restore_rate_change),
+                "restore_rate_change_paired_studentized": paired_studentized_summary(
+                    restore_rate_change
+                ),
+                "n_units": len(keys),
+                "sampling_unit": "independent world seed; paired policy difference",
+                "paired_key": "scenario + seed + candidate_stream_sha256",
                 "restore_price_break_even": (
                     mean(utility_delta) / mean_restore_rate_change
                     if utility_delta and mean_restore_rate_change > 0.0
@@ -1375,6 +1620,10 @@ def run_experiment(
             scenario = replace(scenario, horizon=horizon)
         random_rows.extend(aggregate_seed(seed, scenario))
 
+    triggered_rows: List[Dict[str, object]] = []
+    for seed in range(named_seeds):
+        triggered_rows.extend(aggregate_triggered_seed(seed))
+
     protocol = {
         "status": "revised-after-v2-formal-audit-and-refrozen",
         "benchmark_source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest().upper(),
@@ -1405,18 +1654,77 @@ def run_experiment(
             "task_adaptive_cap_candidate",
             "hierarchical_candidate",
             "hierarchical_sentinel_candidate",
+            "hierarchical_sentinel_guarded",
         ],
+        "semi_synthetic_trigger": {
+            "name": "semi_synthetic_mechanism_trigger",
+            "seeds": named_seeds,
+            "purpose": "paired mechanism check; excluded from public-data claims",
+            "triggered_modules": [
+                "recoverability",
+                "adaptive_budget",
+                "group_to_item_sentinel_correction",
+                "sentinel_cost_gate",
+            ],
+        },
     }
     return {
-        "schema_version": "minimal-framework-challenge.v3",
+        "schema_version": "minimal-framework-challenge.v4",
         "protocol": protocol,
         "protocol_sha256": stable_hash(protocol),
         "named_summary": summarize(named_rows),
         "named_pairwise_minimal": paired_minimality(named_rows),
         "random_subgroups": random_subgroups(random_rows),
         "module_contrasts": contrast_summary(named_rows, random_rows),
+        "triggered_summary": summarize(triggered_rows),
+        "triggered_module_contrasts": contrast_summary(triggered_rows, []),
         "named_rows": named_rows,
         "random_rows": random_rows,
+        "triggered_rows": triggered_rows,
+    }
+
+
+def run_triggered_experiment(named_seeds: int) -> Dict[str, object]:
+    """Run only the pre-registered mechanism-trigger worlds.
+
+    This path is intentionally separate from the broad randomized matrix so
+    that cloud jobs can spend their budget on independent paired badcase
+    worlds.  It never changes the policy code or reads latent effects.
+    """
+
+    triggered_rows: List[Dict[str, object]] = []
+    for seed in range(named_seeds):
+        triggered_rows.extend(aggregate_triggered_seed(seed))
+    protocol = {
+        "status": "triggered-paired-studentized-v1",
+        "benchmark_source_sha256": hashlib.sha256(
+            Path(__file__).read_bytes()
+        ).hexdigest().upper(),
+        "named_seeds": named_seeds,
+        "random_world_seeds": 0,
+        "sampling_unit": "independent triggered mechanism world seed",
+        "pairing_key": "scenario + seed + candidate_stream_sha256",
+        "bootstrap": {
+            "method": "studentized",
+            "n_boot": BOOTSTRAP_REPLICATES,
+            "seeds": list(BOOTSTRAP_SEEDS),
+            "alpha": 0.05,
+        },
+        "purpose": "badcase-driven paired ablation; excluded from public-data claims",
+        "triggered_modules": [
+            "recoverability",
+            "adaptive_budget",
+            "group_to_item_sentinel_correction",
+            "sentinel_cost_gate",
+        ],
+    }
+    return {
+        "schema_version": "minimal-framework-challenge-triggered.v1",
+        "protocol": protocol,
+        "protocol_sha256": stable_hash(protocol),
+        "triggered_summary": summarize(triggered_rows),
+        "triggered_module_contrasts": contrast_summary(triggered_rows, []),
+        "triggered_rows": triggered_rows,
     }
 
 
@@ -1426,16 +1734,25 @@ def main() -> None:
     parser.add_argument("--random-world-seeds", type=int, default=120)
     parser.add_argument("--horizon", type=int, default=None)
     parser.add_argument(
+        "--triggered-only",
+        action="store_true",
+        help="run only the independent semi-synthetic mechanism worlds",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=RESULTS_DIR / "minimal_framework_challenge_v3.json",
     )
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
-    result = run_experiment(
-        named_seeds=args.named_seeds,
-        random_world_seeds=args.random_world_seeds,
-        horizon=args.horizon,
+    result = (
+        run_triggered_experiment(args.named_seeds)
+        if args.triggered_only
+        else run_experiment(
+            named_seeds=args.named_seeds,
+            random_world_seeds=args.random_world_seeds,
+            horizon=args.horizon,
+        )
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
@@ -1444,7 +1761,12 @@ def main() -> None:
     )
     if not args.quiet:
         print(args.output)
-        print(json.dumps(result["module_contrasts"], ensure_ascii=False, indent=2))
+        contrast_key = (
+            "triggered_module_contrasts"
+            if args.triggered_only
+            else "module_contrasts"
+        )
+        print(json.dumps(result[contrast_key], ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

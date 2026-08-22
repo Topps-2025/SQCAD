@@ -7,7 +7,10 @@
 1. `11-形式化定理陈述与证明.md`；
 2. `12-必要性证明与识别路线分类学-20260813.md`；
 3. `15-self-obscuring形式定理与严格证明-20260813.md`；
-4. `16-T2严格reduction-separation与P4minimax探测下界-20260813.md`。
+4. `16-T2严格reduction-separation与P4minimax探测下界-20260813.md`（历史诊断范围）；
+5. `17-安全恢复证书定理与匹配下界-20260821.md`；
+6. `18-SQCAD证书-删失桥接定理-20260821.md`（当前理论到实现的接口）。
+7. `19-Agent-Lifecycle-Belief-Control-一般理论-20260822.md`（belief-state、action-dependent censoring、score sufficiency 与可恢复性价值的主理论底稿）。
 
 研究逻辑和路线草稿见 `../../02-历史草稿/研究路线与方案/`；公开数据集实验方案与基线审计见 `../../02-历史草稿/实验方案与基线/`；已完成的 Gap、恢复、必要性和现实性证据见 `../../03-实验证据链/00-实验报告与当前结论.md`。
 

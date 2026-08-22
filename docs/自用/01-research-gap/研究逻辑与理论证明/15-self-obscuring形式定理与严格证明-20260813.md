@@ -1,10 +1,12 @@
 # 15-Self-obscuring 形式定理与严格证明（T1/T2）
 
+> **Scope correction (2026-08-21):** T1(b) below is retained only as a one-sided `W+` diagnostic. Its former horizon-independent/matching interpretation is withdrawn because it does not control false restore in `W-`. The valid finite-horizon safety result is `17-安全恢复证书定理与匹配下界-20260821.md` (Theorems 11–12).
+
 > 本文件把 `14-` §6 的 T1（Self-obscuring lifecycle theorem，最高优先级）与 T2（Reduction separation theorem）形式化并给出严格证明，回答 `14-` §5 缺口 A/B：**self-confirming unidentifiability 是生命周期结构本身产生的，不是人为例子**。数值对应实验在 `src/sqcad/self_obscuring_ablation.py`，结果 `results/self_obscuring_ablation.json`，报告 `实验证据链/13-`。
 >
-> 声称纪律：T1 的 (a)(b)(c) 三个方向均给出完整数学证明（构造 + 信息论 + 概率）；T2 给出 reduction 的定义、反证论证与数值对应，但"任意 reduction 必须加入 evidence-availability state"的形式化证明（需固定 reduction 语言）标注为论证级，如实区分。
+> 声称纪律：T1 的 (a)(b)(c) 三个方向均在各自明确模型内证明；T2 的严格定理只覆盖完全删失、无恢复的 committed faithful-reduction 子类。不得把该子类结果外推为任意 reduction、任意序贯策略或全标准方法类的 impossibility。
 
-> **升级标注（2026-08-13 第二批）**：T2 的严格化已完成于 `16-T2严格reduction-separation与P4minimax探测下界`——定义 1（faithful feedback-preserving reduction，五条可验证性质，含 $\phi$ 世界无关性——即 §3.4 所述"信息集单调性约定"的精确形式化）、引理 3（配对耦合化约不变性）、引理 4（逐点后悔恒等式）、定理 2（max regret $\ge \tfrac12 \tau p(T-n_{\text{early}}) = \Theta(T)$ 对任何忠实化约成立）、推论 2/3（次线性 $\iff$ 显式增加证据可得性状态）。§3.2 的"论证级"由此升级为严格证明；§3.4 的"如实标注"保留作为历史记录，数值对应见 `实验证据链/14-` §2–3。
+> **升级标注（2026-08-13 第二批）**：T2 的严格化见 `16-T2严格reduction-separation与P4minimax探测下界`——定义 1、引理 3/4 和定理 2 对完全删失、无恢复、committed faithful-reduction 子类给出严格结论；推论 2 的“需要新增可得性状态”仍是该定义下的必要性读法，不是对任意 reduction 语言的开放式全称。P4 的定理 3 是 fixed-sample 高斯门槛，定理 4 是有限时域截断 survival-sum 下界；无截断成本式只在 $H\to\infty$ 推论中使用。
 
 ---
 
@@ -85,20 +87,20 @@ $$
 
 ### 2.3 T1(b)：$q>0$ 恢复探测的显式上界（平台）
 
-**定理 T1(b)**（restore 上界）。设 restore-capable 策略在 archived 状态下每步以概率 $q \in (0,1]$ 触发 restore（观测 $y_t$，成本 $c_{\text{probe}}$），一旦运行均值越阈 $\theta < \tau$ 则永久 restore（成本 $c_{\text{restore}}$）。在 K 世界：
+**定理 T1(b)**（显式 Bernoulli restore 上界）。设 restore-capable 策略在 archived 状态下每步独立以概率 $q \in (0,1]$ 触发一次 probe；每次 probe 独立以概率 $\rho=\Phi((\tau-\theta)/\sigma)$ 越过固定阈值；第一次成功立即触发吸收式永久 restore（成本 $c_{\text{restore}}$）。在 K 世界：
 $$
-\mathbb E[R_T] \le \tau p \cdot \frac{1}{q\,\Phi\!\left(\frac{\tau - \theta}{\sigma}\right)} + \frac{c_{\text{probe}}}{q\,\Phi\!\left(\frac{\tau-\theta}{\sigma}\right)} + c_{\text{restore}},
+\mathbb E[R_T] \le \tau p \cdot \frac{1}{q\,\Phi\!\left(\frac{\tau - \theta}{\sigma}\right)} + \frac{c_{\text{probe}}}{\Phi\!\left(\frac{\tau-\theta}{\sigma}\right)} + c_{\text{restore}},
 
 $$
-即 $\mathbb E[R_T] = O(1/q)$，**与 $T$ 无关**（次线性、平台化）。特别地当 $\tau \gg \theta$ 时 $\Phi((\tau-\theta)/\sigma) \approx 1$，$\mathbb E[R_T] \le \tau p / q + c_{\text{probe}}/q + c_{\text{restore}}$。
+即在该**单边正世界诊断模型**中 $\mathbb E_{W+}[R_T] = O(1/q)$；这不是控制 $W-$ 误恢复的 uniform/minimax 结论，也不是 horizon-safe 的平台保证。特别地当 $\tau \gg \theta$ 时 $\Phi((\tau-\theta)/\sigma) \approx 1$，$\mathbb E_{W+}[R_T] \le \tau p / q + c_{\text{probe}} + c_{\text{restore}}$；双侧安全结论改见 17- Theorems 11–12。
 
 *证明*：令 $\mathcal E_k$ 为第 $k$ 次 restore 观测越阈的事件。单次观测 $y \sim N(\tau, \sigma^2)$ 越阈概率 $\rho := P(y > \theta) = \Phi((\tau-\theta)/\sigma)$。restore 时刻 $t^* = \min\{t : \text{触发成功}\}$。触发成功在单次触发中概率 $\rho$，触发本身按几何分布（速率 $q$）到达，故
 $$
-\mathbb E[t^* - n_{\text{early}}] \le \frac{1}{q\rho}, \qquad
-\mathbb E[\#\text{restores}] \le \frac{1}{q\rho}.
+\mathbb E[t^* - n_{\text{early}}] = \frac{1}{q\rho}, \qquad
+\mathbb E[\#\text{probe attempts}] = \frac{1}{\rho}.
 
 $$
-restore 前每步损失 $\tau p$，故 $\mathbb E[R_T] \le \tau p \cdot \mathbb E[t^* - n_{\text{early}}] \le \tau p/(q\rho)$；探测成本 $\le c_{\text{probe}}/(q\rho)$；恢复成本 $c_{\text{restore}}$ 至多一次（恢复后状态 kept，证据流以速率 $p$ 持续，运行均值保持在 $\theta$ 之上 a.s.——对 $k$ 个延续观测 $\bar x_k \to \tau$，不会再跌回）。∎
+restore 前每步损失 $\tau p$，探测成本为 $c_{\text{probe}}$ 乘以尝试次数，恢复成本至多一次；因此 $\mathbb E[R_T] \le \tau p/(q\rho)+c_{\text{probe}}/\rho+c_{\text{restore}}$。恢复动作在本模型中是吸收态；该结论只针对上述显式模型，不外推到任意序贯后验规则。∎
 
 **实验对应**：
 
@@ -108,18 +110,18 @@ restore 前每步损失 $\tau p$，故 $\mathbb E[R_T] \le \tau p \cdot \mathbb 
 | 0.05 | 120 | 141.7 | 0.425 |
 | 0.2 | 30 | 36.8 | 0.110 |
 
-修正时间与 $\tau p/q$ 同阶（需要 $\lceil \theta$ 越阈所需观测数 $\rceil \approx 1$，因 $\tau = 10 \gg \theta = 2$；理论界 600/120/30 与经验 818/142/37 比值 1.1–1.4，常数因子内一致）；斜率随 $q$ 严格递减（q=0.01→0.2：2.454→0.110，单调），与定理的 $O(1/q)$ 一致。**平台不是免费的**：$q$ 越大概率越小但探测成本越高——上界把这一权衡显式化（与 Gate 4 成本合同 $\lambda_{\text{probe}}$ 通道对接）。
+修正时间与 $\tau p/q$ 同阶是该单边诊断参数下的机制核对（需要 $\lceil \theta$ 越阈所需观测数 $\rceil \approx 1$，因 $\tau = 10 \gg \theta = 2$）；它不验证双侧错误控制。斜率随 $q$ 严格递减（q=0.01→0.2：2.454→0.110，单调），与该诊断模型的 $O(1/q)$ 一致；安全 finite-horizon scaling 改由 17- 的 `log(1/delta)` 项检验。
 
 ### 2.4 T1(c)：候选支持独立于 action 时下界消失
 
-**定理 T1(c)**（结构必要性，消融 A/B）。若 $p_{\text{arch}} = p > 0$（候选支持与证据流独立于治理动作；W0 query-local / W1 未审查），则对 watchful committing policy（决策后保留阈值修正规则 $\bar x_k > \theta$）：
+**定理 T1(c)**（结构必要性，固定检查点版本）。若 $p_{\text{arch}} = p > 0$（候选支持与证据流独立于治理动作；W0 query-local / W1 未审查），则在 $k$ 个 post-decision observations 后，watchful gate 的固定检查点错误概率满足：
 $$
-\mathbb E[R_T] \le \tau p \cdot \mathbb E[t^*] = O(1) \quad (\text{与 } T \text{ 无关}),
+P(\bar X_k \le \theta) \le \frac{\sigma^2}{k(\tau-\theta)^2},
 
 $$
-其中 $t^* = \min\{k : \bar x_k > \theta\}$ 为修正时刻，$\mathbb E[t^*] < \infty$ 是固定常数。
+其中 $\bar X_k$ 是 $k$ 个独立观测的均值。
 
-*证明*：archived 状态下观测仍以速率 $p$ 到达（$p_{\text{arch}} = p$），且观测 $y_t \sim N(\tau, \sigma^2)$（K 世界）。$\bar x_k \to \tau$ a.s.，且 $\tau > \theta$，故 $\bar x_k > \theta$ 最终成立：取 $k_0$ 使 $P(\bar x_{k_0} > \theta) \ge 1 - \delta$（由 Chebyshev，$k_0 = \lceil \sigma^2/(\tau-\theta)^2 \cdot \Phi^{-1}(1-\delta/2)^2 \rceil$ 量级），观测以速率 $p$ 到达故 $\mathbb E[t^*] \le k_0 / p + 1$ 与 $T$ 无关。修正后状态 kept，损失停止。∎
+*证明*：$\mathrm{Var}(\bar X_k)=\sigma^2/k$，直接由 Chebyshev 得上式。取 $k_0=\lceil\sigma^2/[\delta(\tau-\theta)^2]\rceil$ 即有固定检查点成功概率至少 $1-\delta$。该命题不声称任意 sequential gate 的期望停止时间。∎
 
 **实验对应**：`W0_K_watchful_no_restore` slope $= 0.0440$（修正约 15 步），`W1_K_watchful_no_restore` slope $= 0.0663$（修正约 22 步）——线性下界消失。而同一策略在 W2（$p_{\text{arch}}=0$）slope $= 5.85$。**去掉候选–证据反馈后 self-obscuring 消失**，这是消融 A/B 的关键判据（`14-` §7.1）。
 
@@ -160,9 +162,9 @@ $$
 
 ### 3.4 如实标注
 
-- 3.2 是**论证级**证明：它依赖 reduction 保持信息集单调性的约定，完整的语义形式化需要固定 reduction 语言（例如 morphism 范畴或程序等价），本轮未做；
+- 3.2 是历史版本的论证级草稿；其可发表的严格版本见 `16-`，但严格版本仍明确限制在完全删失、无恢复、committed faithful-reduction 子类；
 - 控制组数值（3.3）是机制级证据：同一实现、同一种子、只有结构切换；
-- 严格化路径：用 conditional independence 图或 causal diagram morphism 定义 reduction，把"加入 evidence-availability state"形式化为对干预分布的扩张——列为后续工作。
+- 尚未证明的是更大策略类（允许 keep/restore continuation feedback、任意提前停止）的统一 separation；这属于开放扩展，不应作为当前论文已完成结果。
 
 ---
 
@@ -170,7 +172,7 @@ $$
 
 1. **缺口 A 关闭（机制级）**：self-obscuring 不是例子的人为产物——T1(a) 对任意 committing policy 成立，仅依赖持久动作 + 候选审查 + 无 restore 三个结构；T1(c) 显示去掉任一结构下界消失。
 2. **缺口 B 关闭（结构级）**：T2 论证 + 控制组显示"治理动作改变未来证据流"是标准方法无法以普通 reduction 吸收的反馈语义。
-3. **P3 严格化完成**：`12-` 报告的"数值落地、严格证明待做"由本文件的 T1(a)（$\Omega(T)$）与 T1(b)（$O(1/q)$ 平台上界）补上；P4 探测复杂度下界的 Le Cam 证明仍待（Gaussian 实例的常数因子 3.7 数值已给出，minimax-rate 证明标注待做）。
+3. **P3/P4 范围冻结**：T1(a) 给出 $\Omega(T)$，T1(b) 给出显式 Bernoulli restore 上界；P4 的 Gaussian fixed-sample 门槛和有限时域 survival-sum 下界已证明，但不声称任意 sequential minimax-rate 定理。
 4. **框架设计接口**：T1(b) 的 $\tau p/(q\rho)$ 上界给出 restore 概率与成本的显式权衡——SQCAD 的 Qualification 层把"越阈证据"作为恢复授权条件，Access 层把恢复作为持久动作语义的一部分，正对应定理的机制需求（`10-` 识别条件映射的定理级依据）。
 
 ## 5. 复现信息

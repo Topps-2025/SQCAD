@@ -151,5 +151,7 @@ def test_probe_complexity_above_lower_same_order():
 def test_probe_complexity_lower_bound_formula():
     res = probe_complexity(mu1=1.0, mu2=-1.0, sigma=1.0, delta=0.05,
                            n_seeds=50)
-    assert res["lower_bound"] == pytest.approx(
-        math.log(20.0) / 2.0, abs=1e-9)          # KL = 4/2 = 2
+    from statistics import NormalDist
+    expected = math.ceil((2.0 * NormalDist().inv_cdf(0.95) / 2.0) ** 2)
+    assert res["lower_bound"] == expected
+    assert res["lower_bound_kind"] == "exact_equal_variance_gaussian"

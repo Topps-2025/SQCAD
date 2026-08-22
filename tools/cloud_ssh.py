@@ -17,8 +17,8 @@ import sys
 
 import paramiko
 
-HOST = "connect.westd.seetacloud.com"
-PORT = 11492
+HOST = "connect.westb.seetacloud.com"
+PORT = 24466
 USER = "root"
 
 

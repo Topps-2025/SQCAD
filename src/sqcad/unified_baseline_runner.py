@@ -184,12 +184,12 @@ BASELINE_SPECS: Dict[str, Dict[str, Any]] = {
         "translation": "score = posterior success_rate with implicit 100-"
                        "exposure history; top-`budget`",
         "transportability": "proxy",
-        "transport_note": "estimand-faithful to the paper's associational "
-                          "signal; the trust/suppression bookkeeping on "
-                          "per-query conditioning is not present on this "
-                          "stream (there is no per-query writer layer) -> "
-                          "not reproduced as the full system; used as the "
-                          "associational-governance strategy",
+        "transport_note": "MW-shaped associational score only: this runner "
+                          "uses the stream's success_rate / implicit history, "
+                          "not the paper's per-memory success/failure counters "
+                          "conditioned on actual retrieval.  Not reproduced "
+                          "as the full method; use only as an associational "
+                          "control.",
     },
     "oblivion": {
         "group": GROUP2,
@@ -265,10 +265,10 @@ BASELINE_SPECS: Dict[str, Dict[str, Any]] = {
                        "the most decision-relevant groups, neutral groups "
                        "compress away",
         "transportability": "proxy",
-        "transport_note": "distinction criterion transported onto the "
-                          "stream's effect estimates; the paper's "
-                          "compression decoder is not transportable -> named "
-                          "proxy, not reproduction",
+        "transport_note": "internal distinction heuristic transported onto "
+                          "effect estimates.  It does not implement DeMem's "
+                          "certified decision-conflict partition learner or "
+                          "rate-distortion boundary; named proxy only.",
     },
     "sage": {
         "group": GROUP2,
@@ -294,11 +294,10 @@ BASELINE_SPECS: Dict[str, Dict[str, Any]] = {
         "translation": "score = item_effect_lcb (the shared stream's "
                        "per-item do-effect estimate); top-`budget`",
         "transportability": "proxy",
-        "transport_note": "estimand-faithful: the gap-proof CMI shows the "
-                          "local effect is the paper's estimand; the "
-                          "controlled-perturbation oracle is not available "
-                          "offline -> simplified estimand implementation, "
-                          "full system not reproduced",
+        "transport_note": "local-effect estimand control only.  CMI's "
+                          "official three-condition no/with/perturbed LLM "
+                          "intervention pipeline is not run here; full CMI "
+                          "system not reproduced.",
     },
     "trivium": {
         "group": GROUP3,
@@ -314,9 +313,10 @@ BASELINE_SPECS: Dict[str, Dict[str, Any]] = {
                        "the shared task distribution; item effect used when "
                        "identified, group effect otherwise",
         "transportability": "proxy",
-        "transport_note": "regret objective transported onto the stream; the "
-                          "explicit probing layer (and its cost) belongs to "
-                          "the Gate 4 probe contract, not transported here",
+        "transport_note": "demand-weighted effect control only.  It does not "
+                          "implement Trivium's persistent causal log, temporal/"
+                          "epistemic regret ledger, detectability assumptions, "
+                          "or its budgeted causal probes.",
     },
     "memaudit": {
         "group": GROUP3,

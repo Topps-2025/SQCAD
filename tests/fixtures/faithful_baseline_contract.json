@@ -1,0 +1,23 @@
+{
+  "candidates": [
+    {"memory_id": "m1", "content": "alpha", "partition_key": "p"},
+    {"memory_id": "m2", "content": "beta", "partition_key": "p"},
+    {"memory_id": "risky", "content": "danger", "risk": true}
+  ],
+  "episodes": [
+    {
+      "episode_id": "e1",
+      "candidate_ids": ["m1", "risky"],
+      "exposed_ids": ["m1"],
+      "success": true,
+      "cmi_scores": {
+        "__none__": {"no_memory": 0.2},
+        "m1": {"with_memory": 0.9, "perturbed_memory": 0.8},
+        "risky": {"with_memory": 1.0, "perturbed_memory": 0.9}
+      },
+      "probe_candidates": ["m1"],
+      "probe_observations": {"m1": {"effect": 0.5, "outcome_regret": 1}},
+      "write_evidence": {"m1": {"support_ids": ["s1"]}}
+    }
+  ]
+}

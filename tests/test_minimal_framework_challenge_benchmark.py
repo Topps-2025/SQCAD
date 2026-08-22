@@ -217,6 +217,7 @@ def test_module_contrasts_change_only_the_declared_mechanism():
         "hierarchical_structure": {"hierarchical"},
         "adaptive_budget": {"adaptive_budget"},
         "group_to_item_sentinel_correction": {"sentinel_correction"},
+        "sentinel_cost_gate": {"sentinel_cost_gate"},
         "risk_conditioned_decay": {"decay_rule"},
         "recoverability": {"recoverable", "restore_enabled"},
         "oracle_structure_reference": {"oracle_groups"},
@@ -246,3 +247,58 @@ def test_empty_subgroup_is_reported_without_fabricated_statistics():
             for metric in policy.values():
                 if metric["n"] == 0.0:
                     assert metric["mean"] is None
+
+
+def test_semi_synthetic_trigger_exercises_recovery_and_adaptive_budget():
+    world = benchmark.build_triggered_world(0)
+    rows = {
+        row["policy"]: row
+        for row in [benchmark.run_policy(world, spec) for spec in benchmark.POLICY_SPECS]
+    }
+    no_restore = rows["item_causal_risk_no_restore"]
+    minimal = rows["minimal_framework"]
+    adaptive = rows["task_adaptive_cap_candidate"]
+    assert minimal["restore_events"] > no_restore["restore_events"]
+    assert minimal["utility"] > no_restore["utility"]
+    assert adaptive["utility"] > minimal["utility"]
+    assert adaptive["regret"] < minimal["regret"]
+
+
+def test_semi_synthetic_trigger_exercises_sentinel_path_and_records_cost():
+    world = benchmark.build_triggered_world(0)
+    rows = {
+        row["policy"]: row
+        for row in [benchmark.run_policy(world, spec) for spec in benchmark.POLICY_SPECS]
+    }
+    hierarchical = rows["hierarchical_candidate"]
+    sentinel = rows["hierarchical_sentinel_candidate"]
+    # The sentinel must change the item-level probe path.  This trace is a
+    # deliberately noisy challenge: activating it is not assumed to improve
+    # utility, so the result also guards against hiding a sentinel badcase.
+    assert sentinel["mean_item_probes"] > hierarchical["mean_item_probes"]
+    assert sentinel["probe_cost"] > hierarchical["probe_cost"]
+
+
+def test_sentinel_cost_gate_is_paired_and_can_reject_badcase_probes():
+    world = benchmark.build_triggered_world(0)
+    rows = {
+        row["policy"]: row
+        for row in [benchmark.run_policy(world, spec) for spec in benchmark.POLICY_SPECS]
+    }
+    unguarded = rows["hierarchical_sentinel_candidate"]
+    guarded = rows["hierarchical_sentinel_guarded"]
+    assert guarded["mean_item_probes"] <= unguarded["mean_item_probes"]
+    assert guarded["probe_cost"] <= unguarded["probe_cost"]
+
+
+def test_triggered_contrast_emits_seed_level_paired_studentized_ci():
+    rows = []
+    for seed in (0, 1):
+        rows.extend(benchmark.aggregate_triggered_seed(seed))
+    result = benchmark.contrast_summary(rows, [])
+    contrast = result["sentinel_cost_gate"]["all"]
+    ci = contrast["utility_delta_paired_studentized"]
+    assert contrast["n_units"] == 2
+    assert contrast["paired_key"] == "scenario + seed + candidate_stream_sha256"
+    assert ci["status"] == "estimated"
+    assert ci["n_units"] == 2

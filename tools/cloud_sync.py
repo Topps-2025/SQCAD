@@ -19,10 +19,17 @@ import sys
 import time
 from pathlib import Path
 
+# Remote logs contain Unicode progress bars and may be consumed from a
+# Windows console using a legacy code page.  Always emit a UTF-8-safe stream.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+
 import paramiko
 
-HOST = os.environ.get("SQCAD_AUTODL_HOST", "connect.westd.seetacloud.com")
-PORT = int(os.environ.get("SQCAD_AUTODL_PORT", "11492"))
+HOST = os.environ.get("SQCAD_AUTODL_HOST", "connect.westb.seetacloud.com")
+PORT = int(os.environ.get("SQCAD_AUTODL_PORT", "24466"))
 USER = os.environ.get("SQCAD_AUTODL_USER", "root")
 
 

@@ -15,26 +15,24 @@ counters/effects from tasks 1..t-1, and task t's query is consumed only
 after the decision.  New policy names are added alongside the frozen rows
 (never overwritten):
 
-  memory_worth_online -- Beta(1,1) posterior mean over PRIOR QA hits;
-                         retained(t) = top-BUDGET by posterior at t-1.
+  memory_worth_online -- MW-shaped Beta(1,1) posterior over PRIOR lexical
+                         query-overlap events.  The paper's episode
+                         success/failure and actual-retrieval conditioning
+                         are unavailable, so this is not an MW reproduction.
   causal_item_online  -- naive observational exposure contrast over PRIOR
-                         QAs only (support failure -> base score, the same
-                         documented proxy fallback); retained(t) = top-BUDGET
-                         by effect at t-1.
-  demem_online        -- DeMem proxy (preserve distinctions that change
-                         downstream decisions): |posterior - mean posterior|
-                         over PRIOR QAs (deviation from the average
-                         behaviour), retained(t) = top-BUDGET by deviation
-                         at t-1.
-  trivium_online      -- Trivium proxy (triple memory: episodic demand x
-                         semantic prior; the L2 trace task has no
-                         required-group field, so episodic demand is the
-                         number of PRIOR QAs whose query hit the message):
-                         score = (1 + prior hits) x base score.
-  govmem_online       -- GovMem proxy (budget-constrained governance,
-                         evict what minimises expected future loss): keep
-                         the messages that maximally cover PRIOR QAs,
-                         score = prior hits (tie-break base score).
+                         QAs only (support failure -> base score).  This is
+                         an estimand control, not CMI's no/with/perturbed
+                         LLM intervention pipeline.
+  demem_online        -- decision-distinction heuristic
+                         |posterior - mean posterior|.  It is not DeMem's
+                         certified-conflict partition learner.
+  trivium_online      -- demand-weighted semantic control
+                         (1 + prior lexical hits) x base score.  It has no
+                         persistent causal log, posterior-regret ledger, or
+                         budgeted causal-probe policy.
+  govmem_online       -- prior-query coverage control.  GovMem is a
+                         write-time promote/reject/needs-review policy, so
+                         this access-time row is not transportable GovMem.
 
 The transductive batch-score references (demem / trivium / govmem) are
 computed in this file as well (full-QA counters -> one shared top-BUDGET
@@ -92,8 +90,7 @@ def _posterior_mean(counters: Dict[str, Tuple[int, int]]) -> Dict[str, float]:
 
 def _posterior_deviation(
         counters: Dict[str, Tuple[int, int]]) -> Dict[str, float]:
-    """DeMem proxy signal: deviation from the mean posterior (preserve
-    distinctions that change downstream decisions)."""
+    """Internal decision-distinction heuristic, not the DeMem learner."""
     post = _posterior_mean(counters)
     mu = statistics.mean(post.values()) if post else 0.0
     return {mid: abs(p - mu) for mid, p in post.items()}
@@ -102,8 +99,7 @@ def _posterior_deviation(
 def _episodic_demand(
         counters: Dict[str, Tuple[int, int]],
         base: Dict[str, float]) -> Dict[str, float]:
-    """Trivium proxy signal: episodic demand (prior hits) x semantic
-    prior (base score)."""
+    """Demand-weighted semantic control, not a Trivium causal controller."""
     return {mid: (1.0 + counters[mid][0]) * base.get(mid, 0.0)
             for mid in counters}
 
@@ -111,8 +107,7 @@ def _episodic_demand(
 def _coverage_loss(
         counters: Dict[str, Tuple[int, int]],
         base: Dict[str, float]) -> Dict[str, float]:
-    """GovMem proxy signal: keep what maximally covers prior QAs
-    (eviction minimises expected future loss); tie-break by base score."""
+    """Access-time coverage control; GovMem itself is write-time."""
     return {mid: counters[mid][0] + 1e-6 * base.get(mid, 0.0)
             for mid in counters}
 

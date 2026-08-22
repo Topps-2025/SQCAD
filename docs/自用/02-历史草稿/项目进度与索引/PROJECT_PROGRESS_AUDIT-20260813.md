@@ -113,11 +113,11 @@
 | **P0 修正**（C6 隔离、IV lifecycle 化、C7/C8 语义） | ✅ 完成（certificate 形式化仍待） | `实验证据链/12` §1–2 | C6 隔离：协议 1.1914 逐位相同、观测对比按 $(1-2\varepsilon)$ 稀释；lifecycle IV 误差 0.017 vs 偏倚 12.96 |
 | **P1 一般决策识别定理**（$R^*(L,U)=U(-L)/(U-L)$；安全提交 $\iff$ 识别集不跨 0） | ✅ 完成 | `12` 定理文档 §3.6、`实验证据链/12` §3 | **Theorem 5 完整证明** + 计算验证（660 复现 @p*=0.6；决策识别非点识别实例 (500,1650) regret 0） |
 | **P2 拒绝/探测成本边界** | ✅ 完成（数值级） | `实验证据链/12` §4 | $C_{\mathrm{probe}}<330$ 探测胜 commit、$<170$ 胜 defer；与 Gate 4 $\lambda_{\mathrm{probe}}$ 参数对接仍待 |
-| **P3 动态探索必要性**（$\Omega(T)$ 无探索 regret） | ✅ **严格证明完成**（T1(a)，`15`）+ 数值 | `实验证据链/13` §3/§5、`15` | W0–W3 消融：W2 精确 5.85 = $\tau\cdot p\cdot(T-n_{\mathrm{early}})/T$；无恢复提交规则 5.85 精确（`13` §5）；去审查（W0）后 0.044——现象依赖审查结构 |
-| **P4 动态探索上界 + minimax 探测下界**（恢复 $O(1/q)$ + 探测复杂度） | ✅ **严格证明完成**（T1(b) 上界 `15`；定理 3 检测下界 $N^* = \log(1/\delta)/\operatorname{KL}$、定理 4 后悔分解下界、推论 4 阶匹配，`16`）+ 数值 | `16` §2、`实验证据链/14` §4–5、`reduction_closure.py` | 恢复上界 $O(1/(q\rho))$ 与 $T$ 无关；$\mathbb{E}[\text{探测数}] \ge N^*$ 全格点成立（绑定 regime 2.2–3.4×，与 $q$ 无关）；$\mathbb{E}[\text{regret}] \ge L$ 全格点（$r/L \in [2.2, 3.4]$ 绑定 regime）；$U/L$：$\tau\le 0.5$ 恢复类严格占优（<1）、$\tau=1$ 同阶（2.2–3.6）、强信号 regime $U/L \propto 1/N^*$（$C(\delta)$ 显式涵盖）；主配置 $U=800$ $\approx$ 经验 850.2（1.06$\times$） |
+| **P3 动态探索必要性**（$\Omega(T)$ 无探索 regret） | ✅ **在显式模型内严格证明**（T1(a)，`15`）+ 数值 | `实验证据链/13` §3/§5、`15` | W0–W3 消融：W2 精确 5.85 = $\tau\cdot p\cdot(T-n_{\mathrm{early}})/T$；无恢复提交规则 5.85 精确（`13` §5）；去审查（W0）后 0.044——现象依赖审查结构；不外推为任意序贯策略 |
+| **P4 动态探索上界 + minimax 探测下界** | ⚠️ **旧 matching 已撤回并替换**：T1(b) 仅单世界诊断；P4 定理 3/4 保留 fixed-sample 与有限时域等待下界；有效安全上界/下界为 `17` Theorems 11–13，同一 `Safe(H,delta)` 类并显式 false-restore 成本 | `16` §2、`17`、`safe_recovery_theory.py` | 不能再写 horizon-independent $O(1/(q\rho))$ 或旧推论 4 matching；当前主张是 finite-horizon total-cost order，anytime/stitched 另有 coverage overhead；公式与 toy coverage 已测试 |
 | **self-obscuring 结构消融 + self-confirming 全对比（T1/T2 机制证据链，实验 A/B）** | ✅ 完成（严格证明 + 12-seed 数值） | `实验证据链/13`、`15`、`self_obscuring_ablation.py`（15 项新测试） | 主张升级判定（14- §9：验收 1/2 严格满足、3 部分满足）→ 推进 SQCAD 框架设计 |
 | **reduction controls（实验 B，14- §7.2）** | ✅ 完成 | `实验证据链/13` §4 | T2 反证的数值侧；W0/W1 有效、W2 精确线性 |
-| **T2 严格化 + P4 minimax 下界（评审回应批）** | ✅ 完成（严格证明 + 数值佐证） | `16`、`实验证据链/14`、`reduction_closure.py`（16 项新测试）、`self_obscuring_ablation.py`（random_flip/oracle 控制） | 配对恒等式任意策略逐位精确；忠实像上 $\Theta(T)$；禁止 $\phi$ 控制成功；$N^*$ 下界与后悔分解全格点成立；阶匹配（绑定 regime 常数因子） |
+| **T2 严格化 + P4 下界（评审回应批）** | ⚠️ T2 restricted reduction 证明保留；P4 旧 matching 撤回，安全 matching 转至 `17` | `16`、`17`、`reduction_closure.py`、`safe_recovery_theory.py` | T2 仅 fully censored/no-restore committed subclass；P4 仅 fixed-sample/finite-horizon 下界；Theorems 11–13 才是当前同类安全总成本闭环 |
 | 外部 rollout（chronological future） | ⏸ 阻塞（模型端点） | `00 实验证据链` 未验证清单 | — |
 | 公开数据集客观治理比较 | ⏳ 方案已定、实施未完成 | `17-SQCAD公开数据集落地与框架实验方案-20260813.md` | LongMemEval-S 主集 + LoCoMo 复验；统一合同、同一 reader/evaluator、无手工金标依赖 |
 | **公开数据集落地准备批（本批）** | ✅ 完成 | `18-基线开源状态与无GPU复现审计-20260813.md`、`docs/自用/03-实验证据链/15-基线开源状态与无GPU复现审计-20260813.md`、`tools/render_framework_diagram.py` | ①核心源码冻结（255 测试通过 + 四件套清单重生成，聚合 `badbb886…`，code 46/results 25/reports 11）；②框架工程图 13-（Evidence→Qualification→Access→Decision→Lifecycle，含 T1/T2/P4 之后的 censoring-aware 语义与 restore/probe 通道，渲染脚本入仓库）；③GitHub 展示层组建（README 重写、docs_en 更新、CITATION.cff）；④12 个 R3 基线 + 4 个基准数据集逐一网络核查（结论：仅 ActMem 真 GPU 阻塞；其余 API-key 阻塞或纯 CPU；Oblivion 代码公开但 NEC 专有许可；FadeMem/Memory Worth/DeMem/Trivium/GovMem 无官方代码；LoCoMo 官方 F1 无 judge LLM 可纯 CPU 评分） | 按 17 §5 先做 D1/D2 检索协议（可全 CPU）与 LoCoMo 离线 F1；Oblivion/SimpleMem 非 LLM 机器离线验收 |
@@ -136,8 +136,8 @@
 
 ## 六、下一步（按 `14-` §9 验收与 §10 执行顺序；T1/T2 机制证据链 + 评审回应批已落地）
 
-1. **主张升级判定已更新**（本批）：验收条件 1（T1 依赖审查结构、去结构失效）、2（T2 reduction separation）严格满足，3 **现已全部严格满足**（T1(b) 上界严格 + 定理 3/4 探测 minimax 下界严格，`16`；数值佐证 `实验证据链/14`）——"三项中两项"最低条件已远超；据此推进 SQCAD 框架设计（Evidence/Qualification 层的 censoring-aware 语义、restore channel 的 cost-aware 决策——`13` 报告 §5 的 cost_aware 规则数值验证已在框架方向内）；
-2. **P4 已完成**（本批：定理 3 检测下界 + 定理 4 后悔分解 + 推论 4 阶匹配，`16` §2；数值 `实验证据链/14` §4–5）；T2 已完成（`16` §1；`15` §3 升级标注）；
+1. **主张升级判定已更新**：T1(a) 与 T2 restricted separation 可保留；旧 T1(b)/P4 matching 已撤回。当前安全恢复闭环是 `17` Theorems 11–13，仍需独立数学复核和 held-out mechanism-family 实验后才能升级为投稿主结果；
+2. **P4 当前状态**：定理 3 固定样本检测、定理 4 有限时域等待下界保留；同类 total-cost matching 仅引用 `17`，不能再引用 `16` 的旧推论 4；
 3. P0 遗留：authorization certificate 形式化（soundness/verifiability/non-triviality）与 Theorem 4(c′) 收紧；该遗留不阻塞公开数据集客观治理比较，但限制“完整授权理论”的表述。
 4. P2 对接成本合同：$C_{\mathrm{probe}} \leftarrow$ Gate 4 的 $\lambda_{\mathrm{probe}}\cdot\mathbb{E}[\text{probes}]$ 估计，重算边界表；
 5. 长线下游（最近的现实接地增量）：**trace-grounded chronological 实验**（验收 6/7：时间先后 + 因果优先于观察依赖，无模型端点可做）、外部 rollout、声称压缩（最后做）；

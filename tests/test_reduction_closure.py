@@ -8,9 +8,10 @@ Coverage:
     on the image under a faithful reduction accrue exact linear regret on the
     W2 pair; the forbidden-phi control (world-identity smuggled into the
     image context) succeeds;
-  * P4 Theorems 3-4 -- empirical probes-to-decision >= N*(delta) everywhere,
-    and E[Regret_K] >= the Theorem 4 lower bound L, with a bounded constant
-    (E/N* ~ 2.3-3.4) in the binding regime tau <= 1.
+  * P4 Theorems 3-4 -- empirical probes-to-decision >= the fixed-sample
+    N*(delta) everywhere,
+    and E[Regret_K] >= the finite-horizon lifecycle lower bound, with a
+    bounded fixed-sample diagnostic ratio in the binding regime tau <= 1.
 """
 
 import json
@@ -22,7 +23,8 @@ import pytest
 
 from sqcad.reduction_closure import (
     DELTA, HORIZON, N_EARLY, P_EXPOSE, PER_STEP_PAIR_SUM, QS, TAU, TAUS,
-    Z, _ci_stop_trial, _mean, _n_star, detection_bound_sweep,
+    Z, _ci_stop_trial, _finite_lifecycle_lower, _mean, _n_star,
+    detection_bound_sweep,
     pairing_identity, reduction_image)
 from sqcad.self_obscuring_ablation import (
     INITIAL_STATE, build_world, config_for, run_policy)
@@ -104,11 +106,11 @@ def test_reduction_image_uncensored_learner_learns():
 
 
 def test_n_star_formula():
-    # N*(delta) = log(1/delta) / KL, KL = 2 tau^2 / sigma^2
-    assert _n_star(0.25) == pytest.approx(math.log(1.0 / DELTA) / 0.125,
-                                          rel=1e-9)
-    assert _n_star(1.0) == pytest.approx(math.log(1.0 / DELTA) / 2.0,
-                                         rel=1e-9)
+    # Exact symmetric-Gaussian threshold: ceil((sigma/tau)^2 z_(1-delta)^2).
+    from statistics import NormalDist
+    z = NormalDist().inv_cdf(1.0 - DELTA)
+    assert _n_star(0.25) == math.ceil((z / 0.25) ** 2)
+    assert _n_star(1.0) == math.ceil(z ** 2)
 
 
 def test_empirical_probes_never_below_n_star():
@@ -126,24 +128,36 @@ def test_empirical_probes_never_below_n_star():
 
 
 def test_detection_sweep_binding_regime_ratio_bounded():
-    # in the binding regime (tau <= 1, N* >= 1.5) the CI-exclusion rule
-    # matches N* up to a constant ~2.3-3.4
+    # In the binding regime (tau <= 1), the sequential CI rule is an
+    # order/constant-factor diagnostic against the strict fixed-sample
+    # threshold.  It is not claimed to attain the fixed-sample constant.
     res = detection_bound_sweep(n_seeds=100)
     for tau in (0.25, 0.5, 1.0):
         row = res["rows"][f"tau_{tau}"]
         for q in QS:
             ratio = row[f"q_{q}"]["probe_ratio_E_over_Nstar"]
-            assert 1.5 <= ratio <= 4.5, (tau, q, ratio)
+            assert 0.9 <= ratio <= 3.5, (tau, q, ratio)
 
 
-def test_detection_sweep_regret_above_lower_bound():
-    # Theorem 4: E[Regret_K] >= L for every (tau, q) cell
+def test_finite_lifecycle_lower_bound():
+    # Theorem 4 finite-horizon form: total measured regret dominates the
+    # truncated lifecycle-loss lower bound. The N/rho probe term is only an
+    # infinite-horizon expression.
     res = detection_bound_sweep(n_seeds=100)
     for tau in TAUS:
         row = res["rows"][f"tau_{tau}"]
         for q in QS:
             cell = row[f"q_{q}"]
-            assert cell["regret_K"] >= cell["lower_bound_L"] * 0.99, (tau, q)
+            assert cell["regret_K"] >= cell["lower_bound_finite_lifecycle"] * 0.99, (tau, q)
+
+
+def test_asymptotic_lower_bound_is_labeled_diagnostic():
+    res = detection_bound_sweep(n_seeds=100)
+    for tau in TAUS:
+        row = res["rows"][f"tau_{tau}"]
+        for q in QS:
+            cell = row[f"q_{q}"]
+            assert cell["lower_bound_L"] >= cell["lower_bound_finite_lifecycle"]
 
 
 def test_detection_sweep_regret_decomposition_consistent():

@@ -9,6 +9,14 @@ import re
 import sys
 from pathlib import Path
 
+# Windows PowerShell may expose a legacy code page (for example GBK) on
+# stdout.  The validator reports Unicode math symbols and Chinese paths, so
+# make its output encoding explicit instead of allowing a late print failure.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
+
 REPO = Path(__file__).resolve().parents[1]
 MARKS = re.compile(r"[αβγδεθτσΣ∑∏∫√≈≠≤≥×−∈Θ→↦·±∞∂λρφΦΨκ]")
 # math-expression leftovers that should have been wrapped

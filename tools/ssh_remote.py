@@ -16,8 +16,8 @@ import sys
 
 import paramiko
 
-HOST = os.environ.get("SQCAD_AUTODL_HOST", "connect.weste.seetacloud.com")
-PORT = int(os.environ.get("SQCAD_AUTODL_PORT", "48222"))
+HOST = os.environ.get("SQCAD_AUTODL_HOST", "connect.westb.seetacloud.com")
+PORT = int(os.environ.get("SQCAD_AUTODL_PORT", "24466"))
 USER = os.environ.get("SQCAD_AUTODL_USER", "root")
 
 

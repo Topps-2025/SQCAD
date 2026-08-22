@@ -48,6 +48,10 @@ $$\min\{R^*(L,U),\ C_{\text{defer}},\ C_{\text{probe}} + R^*_{\text{after\_probe
 
 where $R^*(L,U) = \frac{U(-L)}{U-L}$ is the minimax regret of committing. The identification set must not cross the action boundary; otherwise the action stays unresolved, defers, or pays for a probe/restore that reopens the evidence channel. Archive-induced silence is censoring, not negative evidence: evidence starvation caused by a past action must be distinguishable from true non-value before any further decay.
 
+### Certificate–Censoring Bridge
+
+The anytime/stitched gate maps to the implementation only under an explicit contract: before terminal authorization the candidate remains archived and cannot default to keep; probe attempts are predictable and bounded by the declared attempt rate; a successful attempt has the declared success channel; successful observations are conditionally sub-Gaussian around a fixed lifecycle contrast; and the interval uses the same radius with strict one-sided inequalities. Under this contract, `QualificationAccess` is pathwise equivalent to the three-way sequential gate, while `SequentialQualificationGate` enforces terminal no-probe semantics; wrong authorization is bounded by the declared alpha, and the margin-separated stopping/cost bound transfers. This is a contract-level guarantee, not automatic coverage for raw LLM judgments, drifting targets, estimated variance, or dependent probes.
+
 ## Complexity and boundary
 
 The shared retriever, writer, reader, LLM and evaluator are infrastructure rather than claimed novelty. SQCAD does not claim causal discovery from observational success, universal transport across scopes, permanent global retention or physical deletion.
