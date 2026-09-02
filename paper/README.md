@@ -59,10 +59,15 @@ rounding to 8 digits; its widest witness (shared by four surfaces) is world
 `-134.17` and `+43.4451` and a randomized-minimax floor of `32.81831931519336`.
 
 The LifecycleBench-v3 dataset itself is published in
-[`../benchmarks/lifecyclebench_v3/`](../benchmarks/lifecyclebench_v3/), and its
-bundled scorer reproduces the deterministic SQCAD row of the paper's lifecycle
-table exactly (value 1.083, regret 0.944, recoverability 0.769, scope/version
-0.700).
+[`../benchmarks/lifecyclebench_v3/`](../benchmarks/lifecyclebench_v3/). Feeding the
+frozen `sqcad_cert_conflict` column of its `policy_rows.jsonl` to the bundled
+standalone `score.py` reproduces the paper's `SQCAD + lineage` row exactly (value
+1.083, regret 0.944, recoverability 0.769, scope/version 0.700), and the
+`probe_willing` column reproduces the abstention row (1.964, 0.063). The bundled
+`example_controller.py` is a *public-layer re-implementation*, not a replay: its
+`qualify` rule matches `sqcad_cert` exactly (−7.189, 9.216), while
+`qualify_lineage` approximates the lineage test lexically and lands at 1.706 /
+0.321. See that directory's README for the full rule-by-rule table.
 
 ## Evidence conventions used in the text
 
