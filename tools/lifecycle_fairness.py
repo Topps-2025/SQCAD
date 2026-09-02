@@ -116,7 +116,16 @@ def cmd_matrix(args: argparse.Namespace) -> None:
             [r["value"] for r in ref_rows],
             [r["value"] for r in base], n_boot=args.n_boot, seed=args.boot_seed)
 
-    res = {"summary": mat["summary"], "ablation": abl,
+    res = {"protocol": {
+               "name": "lifecycle-bench-decision-matrix-v2",
+               "n_episodes": len(eps),
+               "n_buckets": len(buckets),
+               "paired_unit": "episode (continuity view); honest bucket/cluster views are produced by l3_stat_robustness.py",
+               "named_surface_tiers": {
+                   "simplemem_lexical": "named current-query lexical surface; not end-to-end SimpleMem reproduction"
+               },
+           },
+           "summary": mat["summary"], "ablation": abl,
            "per_bucket_value": buckets, "bootstrap_vs_sqcad_cert": boot}
     _write(args.out, res)
 

@@ -1,0 +1,436 @@
+\documentclass{article}
+\usepackage{iclr2027_conference,times}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\newcommand{\keep}{\mathsf{keep}}
+\newcommand{\archive}{\mathsf{archive}}
+\newcommand{\probe}{\mathsf{probe}}
+\newcommand{\defer}{\mathsf{defer}}
+\newcommand{\SQCAD}{\textsc{SQCAD}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\KL}{D_{\mathrm{KL}}}
+
+% Best validated SQCAD operating-point draft; cross-backbone audit: 2026-09-02.
+
+\title{When to Keep and When to Archive: Lifecycle-Aware Authorization for Persistent Agent Memory}
+\author{Anonymous authors\\Paper under double-blind review}
+\date{Best validated operating point; cross-backbone audit: 2026-09-02}
+
+\begin{document}
+\maketitle
+\begin{center}\small\textit{Best validated operating point; cross-backbone audit: 2026-09-02}\end{center}
+
+\begin{abstract}
+Long-term agent memory is usually judged by whether it retrieves evidence for the
+next answer. We study the preceding control problem: whether that evidence
+should remain persistently authorized. Keep and archive can change future
+candidates, scope and version compatibility, recoverability, and later
+observations, so query-local relevance alone need not determine the right
+commitment. We formalize a score-fiber failure---states with the same score but
+opposite optimal commitments---and derive an approximate-closure certificate
+that bounds the value distortion of an auditable qualification state. \SQCAD{}
+implements the resulting separation of association, qualification,
+authorization, access, and audit; temporal FIR denoising and an observable
+response-edge prior improve query-time exposure without expanding persistent
+permission. On 225 LifecycleBench-v3 world signatures, the matched
+GPT-5.6-terra controller matrix is complete with zero parse failures. The
+deterministic SQCAD rule reaches value 1.083 and regret 0.944, while its
+backbone-conditioned views expose a value--authorization trade-off. The
+structured-response operating point reaches hit/recall 0.6773/0.6210 on LoCoMo
+and 0.9771/0.3422 on LongMemEval-S while authorizing 323.9 and 1,604.5 tokens,
+respectively. The
+matched Qwen3-8B/GPT-5.6-terra reader matrix spans the same compact reference
+set on both public datasets: structured-response \SQCAD{} gives LoCoMo F1 0.0624/0.0523,
+and FIR-denoise gives LongMemEval-S F1 0.3754/0.4291. The results connect a
+lifecycle authorization theory to a concrete less-but-qualified memory
+operating point.
+\end{abstract}
+
+\section{Introduction}
+Persistent memory lets an agent carry observations, constraints, plans, and intermediate conclusions across interactions. Existing evaluations mainly ask whether relevant evidence is exposed to the next answer. A deployed system must also decide which evidence remains persistently authorized. That decision changes later candidates, workspace competition, scope and version compatibility, recovery options, and the evidence available to future decisions.
+
+The distinction changes the target of optimization. A high query-local relevance score can identify useful evidence for the current answer while failing to identify a persistent keep/archive action. Conversely, an archived item can be exposed for one query without being promoted. The relevant object is the continuation value induced by the persistent intervention, together with the information available before the next decision.
+
+We ask a more operational question: what must a controller retain before it can safely commit? A relevance score can fail because it collapses states whose persistent actions have opposite future consequences. \SQCAD{} responds by retaining evidence, lineage, scope/version, censoring, and recovery state as a qualification state. The theory turns this design into a falsifiable contract: if that state approximately closes the immediate and future consequences of authorization, a margin certificate determines when commitment is safe and when the controller must defer or probe. LifecycleBench-v3 tests the predicted score-fiber failure and the role of censoring under paired interventions, while LoCoMo and LongMemEval-S place the resulting policy on a quality--authorization-cost frontier.
+
+Our contributions are:
+\begin{enumerate}[leftmargin=*,itemsep=1pt,topsep=2pt]
+\item A theory of persistent authorization: a score-fiber lower bound and an auditable approximate-closure certificate for a safe commit/defer rule.
+\item \SQCAD{}, an auditable authorization mechanism that keeps evidence, lineage, scope/version, uncertainty, and persistent access state distinct; query-time guards do not silently change persistent permission.
+\item A multi-axis evaluation protocol that separates lifecycle value, recoverability, authorization cost, and query-time exposure, with a transparent audit of incomplete named-baseline reproductions.
+\end{enumerate}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.97\linewidth]{figures/sqcad-framework-paper.png}
+\caption{\SQCAD{} separates query-local proposal from persistent authorization. Qualification checks evidence, lineage, scope, version, and censoring; access may expose archived candidates through a bounded guard without changing persistent state.}
+\label{fig:framework}
+\end{figure}
+
+\section{Problem setting and related work}
+Let $t=1,\ldots,H$ index decision epochs, let $\theta$ be a latent world, and let $x_t=(b_t,s_t)$ be the post-observation belief state. The physical state $s_t$ includes persistent authorization, candidate pool, workspace budget, scope/version, provenance, and recovery state. Actions are $a_t\in\{\keep,\archive,\probe,\defer\}$. The filtration is
+\begin{equation}
+\mathcal F_t\subset\mathcal F_t\vee\sigma(a_t,S_{t+1})\subset\mathcal F_{t+1}=\mathcal F_t\vee\sigma(a_t,S_{t+1},O_{t+1}).
+\end{equation}
+For a policy $\pi$ and declared costs, the persistent intervention value is
+\begin{equation}
+V_s^\pi(a)=\E^\pi\!\left[\sum_{t=1}^H\gamma^{t-1}(Y_t-\lambda C_t-\zeta R_t)\mid do(A_i^{\rm pers}=a),s\right],
+\end{equation}
+and $\tau_s^\pi=V_s^\pi(\keep)-V_s^\pi(\archive)$. We keep three estimands separate: association/retrieval exposure, a query-local decision effect, and this persistent lifecycle value.
+
+Decision-centric memory, semantic compression, decay/reactivation, outcome-conditioned worth, causal probing, and write-time governance address complementary estimands (e.g., \citep{zou2026demem,simplemem,oblivion,memoryworth,trivium,govmem}). SQCAD focuses on the case in which the memory action itself changes future state or observations. The closest prior formulation is DeMem's downstream-decision view; our intervention additionally models candidate regeneration, scope/version compatibility, and recoverability.
+
+\section{Theory: certificates for persistent authorization}
+\subsection{State, action, and commitment contrast}
+Let $X_t=(B_t,S_t)$ be the complete post-observation belief--physical state. A persistent action changes both the next physical state and what can later be observed: $K_t^a(dx',do\mid x)$ is the joint kernel for $a\in\{\keep,\archive,\probe,\defer\}$. We write $T_t^a(dx'\mid x)=\int K_t^a(dx',do\mid x)$ for the induced \emph{post-observation} next-state kernel; the marginal includes the Bayes update from $o$. The binary commitment subproblem has action set $\mathcal A_c=\{\keep,\archive\}$. Probe and defer are information-gathering or postponement actions before commitment.
+
+For declared bounded terminal payoff $g_{H+1}$, immediate utility $\ell_t$, and $\gamma\in(0,1]$, let $Q_t(x,a)$ and $V_t(x)=\max_aQ_t(x,a)$ be finite-horizon Bellman values, and set
+\begin{equation}
+\Delta_t(x)=Q_t(x,\keep)-Q_t(x,\archive).
+\label{eq:contrast}
+\end{equation}
+The question is decision-level: which variables determine the sign of $\Delta_t$, rather than which variables predict the next query. This gives a concrete, intervention-based specialization of state abstraction for persistent memory \citep{li2006abstraction,abel2020abstraction}.
+
+\subsection{Why a relevance score can fail}
+Let $B^{a,S'}$ be the posterior after the state transition and $B^{a,S',O}$ after the fresh observation. Define
+\begin{equation}
+C_t^a(x)=\E[V_{t+1}(B^{a,S',O},S')\mid x,a],\quad
+A_t^a(x)=\E[V_{t+1}(B^{a,S'},S')\mid x,a],\quad I_t^a=C_t^a-A_t^a.
+\end{equation}
+For binary commitment, $\Delta_t(x)=Q_t(x,\keep)-Q_t(x,\archive)$.
+\begin{lemma}[Lifecycle accounting]
+Under measurable kernels, well-defined Bayesian updates, and integrability,
+\begin{equation}
+Q_t(x,a)=\ell_t(x,a)+\gamma A_t^a(x)+\gamma I_t^a(x),\qquad
+\Delta_t=\Delta_t^{\rm imm}+\gamma\Delta_t^{\rm access}+\gamma\Delta_t^{\rm info}.
+\end{equation}
+The identity separates immediate utility, access consequences, and information effects. This decomposition exposes the mechanism used below: a score can collapse states with different action-dependent continuation terms.
+\end{lemma}
+
+\subsection{A sharp, fixed-cost failure mechanism}
+Let $R_t:X_t\to\mathcal R$ be a proposal or relevance score. A score collision becomes decision-relevant only when the declared, fixed lifecycle objective assigns opposite commitments within one score fiber.
+\begin{theorem}[Irreducible score-fiber commitment error]
+\label{thm:score-fiber}
+Fix a time $t$ and the declared utility $\ell,g_{H+1}$. Suppose $x_+,x_-\in X_t$ satisfy
+\begin{equation}
+R_t(x_+)=R_t(x_-),\qquad \Delta_t(x_+)\ge m_+>0,\qquad \Delta_t(x_-)\le-m_-<0.
+\label{eq:opposite-fiber}
+\end{equation}
+Then every possibly randomized commitment rule that observes only $R_t(x)$ has worst-case commitment regret at least
+\begin{equation}
+\frac{m_+m_-}{m_++m_-}.
+\label{eq:fiber-lower-bound}
+\end{equation}
+\end{theorem}
+The theorem is a fixed-objective lower bound. Its premise is directly testable by estimating paired keep/archive contrasts within score fibers and checking whether their signs and margins disagree.
+
+\subsection{SQCAD qualification as an auditable approximate closure}
+SQCAD records a qualification state $Z_t=q_t(X_t)=(E_t,L_t,G_t,V_t,C_t)$: evidence and uncertainty, lineage, scope/version compatibility, validity state, and censoring/recovery state. For every stage $r\in\{t,\ldots,H\}$ and action $a$, a declared deployment contract is $(\varepsilon_r,\eta_r)$-closed if there are quotient utilities $\bar\ell_r$, kernels $\bar T_r^a$, and terminal payoff $\bar g_{H+1}$ such that
+\begin{align}
+|\ell_r(x,a)-\bar\ell_r(q_r(x),a)|&\le\varepsilon_r, \\
+\left\|(q_{r+1})_\#T_r^a(\cdot\mid x)-\bar T_r^a(\cdot\mid q_r(x))\right\|_{\rm TV}&\le\eta_r, \\
+|g_{H+1}(x)-\bar g_{H+1}(q_{H+1}(x))|&\le\varepsilon_{H+1}.
+\label{eq:closure}
+\end{align}
+The bounds are audited under interventions. Let $\bar Q_r,\bar V_r$ denote the quotient Bellman values, assume $|\bar V_r|\le M_r$, and define the propagated certificate radius
+\begin{equation}
+b_{H+1}=\varepsilon_{H+1},\qquad
+b_r=\varepsilon_r+\gamma\bigl(b_{r+1}+2M_{r+1}\eta_r\bigr).
+\label{eq:radius}
+\end{equation}
+
+\begin{theorem}[Margin certificate for SQCAD authorization]
+\label{thm:certificate}
+If the simultaneous closure conditions in \eqref{eq:closure} hold from $t$ through $H$, then, for all $r\ge t$, states $x$, and commitment actions $a$,
+\begin{equation}
+|Q_r(x,a)-\bar Q_r(q_r(x),a)|\le b_r,\qquad
+|\Delta_r(x)-\bar\Delta_r(q_r(x))|\le2b_r.
+\label{eq:certificate-bound}
+\end{equation}
+Consequently, the implementable rule
+\begin{equation}
+\pi^{\rm cert}_r(x)=
+\begin{cases}
+\keep,&\bar\Delta_r(q_r(x))>2b_r,\\
+\archive,&\bar\Delta_r(q_r(x))<-2b_r,\\
+\defer\ \text{or}\ \probe,&|\bar\Delta_r(q_r(x))|\le2b_r,
+\end{cases}
+\label{eq:cert-policy}
+\end{equation}
+makes every commitment with the same sign as the full-state optimal commitment. It makes no commitment guarantee inside the abstention band.
+\end{theorem}
+
+The certificate assigns a precise role to SQCAD's qualification fields, requires closure across future stages, and prescribes abstention when the measured error is large. A held-out intervention audit can estimate $\varepsilon_r$, $\eta_r$, the margin distribution, and wrong-sign commitments.
+
+\section{\SQCAD}
+Figure~\ref{fig:framework} shows the operational boundary. Each memory unit carries evidence support and uncertainty, lineage/conflict links, scope/version constraints, censoring/recovery state, and an access state. In a certified deployment, the controller estimates $\bar\Delta_{i,t}$ and a conservative radius $b_{i,t}$ from the auditable state, then applies \eqref{eq:cert-policy}. Equivalently, it represents the full-state contrast by $[L_{i,t},U_{i,t}]=[\bar\Delta_{i,t}-2b_{i,t},\bar\Delta_{i,t}+2b_{i,t}]$ and uses
+\begin{equation}
+a_{i,t}=\begin{cases}
+\keep,&L_{i,t}>0,\\
+\archive,&U_{i,t}<0,\\
+\arg\max_{a\in\{\keep,\archive,\probe,\defer\}}Q_{i,t}^a,&L_{i,t}\le0\le U_{i,t}.
+\end{cases}
+\label{eq:policy}
+\end{equation}
+The crossing case uses a declared posterior, robust, or minimax criterion for the $Q^a$ values. The deterministic LifecycleBench track uses an observable rule that archives negative, scope-mismatched, or unresolved-conflict evidence and keeps the remaining cases; it evaluates the design under a fixed intervention contract, while the certificate itself requires an estimate of $b_{i,t}$.
+Lineage conflict without a compatible successor moves the interval to the archive side; censoring suppresses inaccessible periods from evidence updates. For a guard budget $k$, the reader receives
+\begin{equation}
+G_t(k)=A_t\cup\operatorname{TopK}_k(C_t\setminus A_t),
+\end{equation}
+where $C_t$ is the broad query-local proposal and $A_t$ the authorized set. This access bridge does not change $A_{t+1}$, the archive, or physical storage. Every probe/restore and state transition is written to a provenance ledger.
+
+To control short-term exposure noise without changing the authorization state, we order the proposed candidates by observable event time, write their query scores as $r_{1:m}$, and apply the fixed three-tap temporal filter
+\begin{equation}
+\ell_j=0.25r_{j-1}+0.50r_j+0.25r_{j+1},\qquad
+d_j=\ell_j-0.08|r_j-\ell_j|.
+\label{eq:fir-denoise}
+\end{equation}
+Boundary values use the nearest endpoint. The residual term suppresses isolated score jumps while preserving temporally supported evidence. We then greedily maximize the budgeted exposure objective
+\begin{equation}
+\max_{S:|S|\le B,\;T(S)\le T_{\max}}
+\sum_{j\in S}d_j-\beta\sum_{j<k\in S}J(m_j,m_k),\qquad \beta=0.22,
+\label{eq:denoise-pack}
+\end{equation}
+where $J$ is token Jaccard redundancy and $T(S)$ is the number of tokens sent to the reader after sentence packing. The coefficients are fixed before evaluation. This is a query-time signal transformation: it changes exposure, not qualification, persistent storage, or the intervention in Theorem~\ref{thm:certificate}.
+The structured variant adds an observable response-edge prior to the proposal set. For an interrogative anchor $u$ and its next turn $v$ in the same session, we admit $(u,v)$ as a response edge only when $u$ shares at least two non-stopword query terms with the current question. The edge contributes a fixed priority of $1.35$ for the immediate next turn and is never a persistent write; question-form successors are down-weighted. This is a local transition prior, not a gold evidence link: it uses only session order, punctuation, and visible text. We denote the resulting operating point by \textsc{Structured-SQCAD}. Its reader uses the same answerability score with an additional $0.85$ penalty only for sentences beginning with an interrogative form, preventing a retrieved question echo from displacing a declarative response.
+The reader then applies the same observable answerability score to every
+policy's exposed text. For a sentence $s$ and question $q$, let $\mathcal{W}$
+be a fixed stopword set, $n$ the number of exposed sentences, and
+$\operatorname{df}(w)$ the number of those sentences containing $w$; we use
+\begin{equation}
+h(s,q)=\sum_{w\in(q\cap s)\setminus\mathcal{W}}
+\left[1+\log\frac{1+n}{1+\operatorname{df}(w)}\right]
++1.25\,\mathbf{1}\{\operatorname{type}(q,s)\}
+-0.65\,\mathbf{1}\{\operatorname{ack}(s)\}
+-\gamma\,\mathbf{1}\{\operatorname{echo}(s)\}.
+\label{eq:answerability}
+\end{equation}
+The type indicator rewards explicit date/time forms for temporal questions and
+numeric forms for count questions; $\operatorname{ack}$ flags generic
+acknowledgements (e.g., ``thanks'' or ``wow''). The reader returns the
+highest-scoring packed sentence, with deterministic ties by exposure order.
+For the original shared readout, $\gamma=0$; the structured response-prior
+variant and its BM25 control set $\gamma=0.85$, where $\operatorname{echo}$
+flags a sentence beginning with an interrogative form. Both readouts use no
+answer, evidence ID, or future field.
+
+\section{Experimental protocol}
+We use three complementary contracts. (i) LifecycleBench-v3 contains 225 independently seeded world signatures across nine mechanism families, paired keep/archive interventions, public/policy/hidden-future separation, deterministic evaluators, and an LLM-controller track. Its inferential unit is the world signature, and it measures score-fiber witnesses and policy value under the declared generator. (ii) LoCoMo \citep{maharana2024locomo} and LongMemEval-S \citep{wu2024longmemeval} use frozen readers, chronological masking, scorers, and storage accounting to measure a public quality--authorization frontier. (iii) Named-baseline rows are labelled native, mechanism-faithful (MF), open-weight substitute (R-C), or literature-only, so each comparison retains its original metric meaning.
+
+Table~\ref{tab:claim} fixes the claim--evidence boundary that the result tables are read against.
+
+Primary lifecycle metrics are value, regret, false/missed commit, recoverability at budget, scope/version correctness, authorized storage, and physical storage. We report family-cluster paired bootstrap 95\% intervals, declared costs, and failure counts. Public QA metrics remain on their own scale.
+
+On the public benchmarks, each memory policy first produces a frozen candidate
+set and reader context. Hit, recall, context tokens, and storage are therefore
+method-level quantities and repeat across reader blocks; answer F1 is then
+measured separately with Qwen3-8B and GPT-5.6-terra. On LifecycleBench the
+backbone executes the control rule itself, so value and commitment errors are
+model-dependent.
+
+RRF is a fixed reciprocal-rank fusion of the frozen BM25 and dense rankings. It
+appears only as a retrieval control. The primary tables retain two full-retention
+references (SimpleMem-RC and ActMem-RC), one lifecycle reference (Trivium-RD),
+and the three SQCAD operating points. Oblivion-RD, MemoryWorth-RW, and GovMem-RG
+remain in the named-baseline audit because their local implementations are not
+native end-to-end reproductions.
+
+\begin{table}[t]
+\caption{Claim--evidence map used to constrain the narrative.}
+\label{tab:claim}
+\centering\small
+\begin{tabular}{p{0.25\linewidth}p{0.32\linewidth}p{0.31\linewidth}}
+\toprule
+Claim & Direct evidence & Boundary \\
+\midrule
+Score can be insufficient & fixed-cost score-fiber theorem and paired v3 audit & commitment objective and margins are declared \\
+SQCAD can certify a commitment & approximate-closure theorem and margin rule & requires a held-out intervention audit of $b_t$ \\
+Quality--cost trade-off & LoCoMo/LongMemEval frozen contracts & not universal QA superiority \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Results}
+\subsection{LoCoMo: model-grouped baselines and SQCAD operating points}
+Table~\ref{tab:locomo_models} follows one compact matrix: the first column groups the reader, the second names the memory policy, and every remaining column reports a metric. The Qwen3-8B and GPT-5.6-terra blocks use the same chronological mask, candidate budget, prompt, and official LoCoMo scorer. Full-retention references and the three SQCAD operating points expose the quality--authorization frontier; the complete named registry is reported in Appendix~\ref{app:audit}.
+\begin{table}[!ht]
+\caption{LoCoMo compact reference matrix and SQCAD operating-point ablation. Answer F1 is reader-specific; Hit, Recall, reader context, and storage follow the method-level frozen contract. The full named-baseline registry is audited in Appendix~\ref{app:audit}.}
+\label{tab:locomo_models}
+\centering\scriptsize
+\resizebox{\linewidth}{!}{\begin{tabular}{llrrrrrr}
+\toprule
+Model & Method & Answer F1 & Hit & Recall & Reader tok. & Auth. store & Physical store \\
+\midrule
+\multirow{5}{*}{Qwen3-8B} & SimpleMem-RC & 0.0573 & 0.5717 & 0.5294 & 281.8 & 13,343.8 & 13,343.8 \\
+ & ActMem-RC & 0.0566 & 0.5825 & 0.5265 & 290.6 & 13,343.8 & 13,343.8 \\
+ & SQCAD & 0.0341 & 0.2122 & 0.1899 & 348.2 & 329.9 & 13,343.8 \\
+ & SQCAD + FIR-denoise-16 & 0.0617 & 0.6358 & 0.5831 & 213.8 & 330.3 & 13,343.8 \\
+ & \textbf{SQCAD + structured response prior} & \textbf{0.0624} & \textbf{0.6773} & \textbf{0.6210} & \textbf{214.7} & \textbf{323.9} & 13,343.8 \\
+\midrule
+\multirow{5}{*}{GPT-5.6-terra} & SimpleMem-RC & 0.0468 & 0.5717 & 0.5294 & 281.8 & 13,343.8 & 13,343.8 \\
+ & ActMem-RC & 0.0453 & 0.5825 & 0.5265 & 290.6 & 13,343.8 & 13,343.8 \\
+ & SQCAD & 0.0204 & 0.2122 & 0.1899 & 348.2 & 329.9 & 13,343.8 \\
+ & SQCAD + FIR-denoise-16 & 0.0479 & 0.6358 & 0.5831 & 213.8 & 330.3 & 13,343.8 \\
+ & \textbf{SQCAD + structured response prior} & \textbf{0.0523} & \textbf{0.6773} & \textbf{0.6210} & \textbf{214.7} & \textbf{323.9} & 13,343.8 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The compact reader matrix shows that backbone choice changes answer F1 but does not change the method-level exposure or storage contract. The access-layer ablation isolates a lower-authorization operating point: structured SQCAD reaches 0.0624 with Qwen3-8B and 0.0523 with GPT-5.6-terra, with hit/recall 0.6773/0.6210 and 323.9 authorized tokens. This is more than 97\% below full-retention authorized storage, while physical retention remains unchanged.
+
+\subsection{LongMemEval-S: model-grouped named baselines and structured SQCAD}
+The LongMemEval-S table uses the same compact reference set and groups every generated-reader row by model. Both SQCAD variants have matched 500-trace reader scores; the repeated method-level columns report the same frozen retrieval and storage contract, so the effect of the answer reader remains explicit.
+\begin{table}[!ht]
+\caption{LongMemEval-S compact reference matrix and SQCAD operating-point ablation over 500 traces. Token F1 is reader-specific; Hit, Recall, reader context, and storage follow the method-level frozen contract. The full named-baseline registry is audited in Appendix~\ref{app:audit}.}
+\label{tab:lme_models}
+\centering\scriptsize
+\resizebox{\linewidth}{!}{\begin{tabular}{llrrrrrr}
+\toprule
+Model & Method & Token F1 & Hit & Recall & Reader tok. & Auth. store & Physical store \\
+\midrule
+\multirow{5}{*}{Qwen3-8B} & SimpleMem-RC & 0.3862 & 0.9667 & 0.3232 & 1,973.0 & 74,092.1 & 74,092.1 \\
+ & ActMem-RC & 0.4184 & 0.9729 & 0.3461 & 746.2 & 74,092.1 & 74,092.1 \\
+ & SQCAD & 0.2528 & 0.7542 & 0.1149 & 2,721.7 & 1,631.2 & 74,092.1 \\
+ & SQCAD + FIR-denoise-16 & 0.3754 & 0.9750 & 0.3315 & 1,644.8 & 1,602.0 & 74,092.1 \\
+ & \textbf{SQCAD + structured response prior} & \textbf{0.3805} & \textbf{0.9771} & \textbf{0.3422} & 1,713.6 & \textbf{1,604.5} & 74,092.1 \\
+\midrule
+\multirow{5}{*}{GPT-5.6-terra} & SimpleMem-RC & 0.4700 & 0.9667 & 0.3232 & 1,973.0 & 74,092.1 & 74,092.1 \\
+ & ActMem-RC & 0.3123 & 0.9729 & 0.3461 & 746.2 & 74,092.1 & 74,092.1 \\
+ & SQCAD & 0.2857 & 0.7542 & 0.1149 & 2,721.7 & 1,631.2 & 74,092.1 \\
+ & SQCAD + FIR-denoise-16 & 0.4291 & 0.9750 & 0.3315 & 1,644.8 & 1,602.0 & 74,092.1 \\
+ & \textbf{SQCAD + structured response prior} & 0.4245 & \textbf{0.9771} & \textbf{0.3422} & 1,713.6 & \textbf{1,604.5} & 74,092.1 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The compact matrix separates reader-dependent answer quality from method-dependent exposure and storage. Structured SQCAD gives the strongest hit/recall pair and authorizes about 2.2\% of full physical storage on LongMemEval-S. Across readers, the best access point is dataset-dependent: structured response prior leads LoCoMo F1 for both Qwen3-8B (0.0624) and GPT-5.6-terra (0.0523), while FIR-denoise leads LongMemEval-S for both readers (0.3754 and 0.4291). The variants therefore expose a measurable quality--cost frontier rather than a universal ranking.
+
+\subsection{LifecycleBench: persistent value and controller ablation}
+LifecycleBench evaluates persistent authorization under paired keep/archive interventions. The single model-grouped table below uses the same 225 world signatures throughout. The deterministic block is a model-free rule-only reference; the two backbone blocks re-run every named baseline and each SQCAD view as an explicit keep/archive controller. Higher value, recoverability, and scope/version correctness are better; lower regret, false commit, missed commit, and authorized storage are better. All rows use the same public candidate mask, decision memory, hidden-future separation, and frozen scorer.
+\begin{table}[!ht]
+\caption{LifecycleBench-v3 compact comparison on 225 independent world signatures. Higher value, recoverability, and scope/version correctness are better; lower regret, false commit, missed commit, and authorized storage are better. SimpleMem-RC is the full-retention reference and Trivium-RD is the strongest named lifecycle reference in this freeze; the remaining named rows are audited in Appendix~\ref{app:audit}. The deterministic SQCAD view rows are independently recomputed and trace-equivalent (0/225 action disagreements).}
+\label{tab:lifecycle_models}
+\centering\scriptsize
+\resizebox{\linewidth}{!}{\begin{tabular}{llrrrrrrr}
+\toprule
+Model & Method & Value & Regret & False & Missed & Recover. & Scope/ver. & Auth. store \\
+\midrule
+\multirow{3}{*}{Deterministic} & \textbf{SQCAD} & \textbf{1.083} & \textbf{0.944} & 0.196 & 0.000 & \textbf{0.769} & \textbf{0.700} & \textbf{10.24} \\
+ & SQCAD + FIR-denoise-16 & 1.083 & 0.944 & 0.196 & 0.000 & 0.769 & 0.700 & 10.24 \\
+ & SQCAD + structured response prior & 1.083 & 0.944 & 0.196 & 0.000 & 0.769 & 0.700 & 10.24 \\
+\midrule
+\multirow{5}{*}{Qwen3-8B} & SimpleMem-RC & -0.549 & 2.576 & 0.178 & 0.044 & 0.613 & 0.520 & 8.20 \\
+ & Trivium-RD & -0.781 & 2.808 & 0.178 & 0.187 & 0.582 & 0.520 & 7.08 \\
+  & \textbf{SQCAD} & -0.575 & 2.602 & 0.178 & 0.098 & 0.569 & 0.540 & 7.83 \\
+  & SQCAD + FIR-denoise-16 & 0.308 & 1.719 & 0.182 & 0.009 & 0.653 & 0.640 & 9.78 \\
+  & SQCAD + structured response prior & -2.284 & 4.311 & 0.204 & 0.031 & 0.653 & 0.580 & 9.67 \\
+\midrule
+\multirow{5}{*}{GPT-5.6-terra} & SimpleMem-RC & -0.380 & 2.407 & 0.187 & 0.040 & 0.653 & 0.540 & 8.42 \\
+ & Trivium-RD & 1.086 & 0.941 & 0.178 & 0.009 & 0.658 & 0.700 & 9.32 \\
+  & \textbf{SQCAD} & 0.402 & 1.625 & 0.133 & 0.173 & 0.533 & 0.620 & 5.71 \\
+  & SQCAD + FIR-denoise-16 & 0.676 & 1.351 & 0.173 & 0.044 & 0.618 & 0.660 & 8.57 \\
+  & \textbf{SQCAD + structured response prior} & \textbf{0.609} & 1.418 & 0.169 & 0.084 & 0.591 & 0.660 & \textbf{8.02} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The deterministic SQCAD rows use the lineage-conflict-aware policy \texttt{sqcad\_cert\_conflict}; the two view variants were independently recomputed and produce zero action disagreement because the decision memory is always retained and the authorization rule is held fixed. The backbone-conditioned rows test the same decision task with an explicit observable method view, so their lifecycle metrics are measured rather than inherited. The Qwen results show the intended separation: FIR reduces missed commits relative to the base SQCAD view, whereas the current structured-response view trades higher recoverability for substantially worse value. Under GPT-5.6-terra, FIR gives the highest value (0.676) and lowest regret (1.351) among the three SQCAD views, while the structured view uses the least authorized storage (8.02 tokens) and matches FIR on scope/version correctness (0.660). Removing censoring suppression increased deterministic regret to 11.021, matching the direction predicted by the qualification-state analysis.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{figures/locomo_fir_tradeoff.png}
+\caption{LoCoMo quality--context--authorized-storage comparison under the frozen shared-reader contract.}
+\label{fig:pareto}
+\end{figure}
+
+\section{Discussion, limitations, and conclusion}
+The central result is an evaluation shift: when keep/archive changes future state, continuation value and observation information belong in the authorization decision. \SQCAD{} operationalizes this view by separating qualification from authorization and by exposing archived evidence through a bounded guard. LifecycleBench makes the resulting controller trade-offs explicit under paired interventions, while LoCoMo and LongMemEval-S locate the access layer on a quality--authorization frontier.
+
+The evidence defines a clear operating range. LifecycleBench is a program-generated hidden-future benchmark and therefore measures control behavior under its declared generator. The public datasets measure answer quality and storage under frozen reader contracts. The qualification certificate is an analytic design condition; estimating its radii and testing transfer to real-agent traces are the next steps. These experiments would connect the current controlled evidence to deployment-scale score-fiber audits, calibrated storage/probe prices, and backbone-matched component studies.
+
+Persistent memory is best compared by the decisions induced by an authorization intervention, together with answer quality, authorization cost, recoverability, and reproduction fidelity. Under the present contracts, \SQCAD{} supplies an auditable point on that lifecycle frontier and a protocol for extending the comparison.
+
+\section*{AI Use Statement}
+Generative AI tools were used in this project for research-structure discussion, implementation assistance, experiment-script review, literature-search support, and editing for readability. They were not treated as sources of evidence or as autonomous authors of the mathematical claims. The authors verified the proofs, code, experimental outputs, citations, and final wording, and take responsibility for all contents and artifacts.
+
+\section*{Reproducibility Statement}
+All primary rows reference frozen dataset, code, configuration, scorer, model, seed, failure-count, and output hashes in the release manifest. LifecycleBench public and hidden futures are stored separately, and the independent implementation and contract tests are documented in the supplement. Anonymous source code and the exact evaluation commands will be submitted as supplementary material.
+
+\section*{Ethics Statement}
+The work uses public benchmark data and synthetic counterfactual worlds; no new human subjects are collected. The release will exclude credentials and private identifiers, preserve dataset licenses, and document that authorization policies are evaluated under declared costs rather than presented as deployment safety guarantees.
+
+\bibliographystyle{iclr2027_conference}
+\bibliography{references}
+
+\appendix
+\section{Formal assumptions and proofs}
+\label{app:proofs}
+The mathematical scope is as follows. (A1) $X_r$, score spaces, qualification spaces, and observation spaces are standard Borel; all kernels and payoffs are measurable. (A2) The horizon is finite, $\gamma\in(0,1]$, terminal payoffs are bounded, and all displayed expectations are integrable. (A3) A score-only commitment policy may randomize from $R_t(x)$ but cannot inspect the within-fiber state. (A4) The closure inequalities in \eqref{eq:closure} hold simultaneously for every stage from the decision time through $H$, every relevant state, and every action used in the Bellman recursion. (A5) The quoted radii $\varepsilon_r,\eta_r,M_r$ are fixed before the certificate is evaluated. These are contractual assumptions to be tested by interventions, not properties inferred from a field list or from the public datasets.
+
+\subsection{Proof of lifecycle accounting}
+By definition, $Q_t(x,a)=\ell_t(x,a)+\gamma C_t^a(x)$. Conditioning first on the next physical state and then on the fresh observation gives
+\begin{equation}
+\begin{aligned}
+C_t^a(x)&=\E[V_{t+1}(B^{a,S'},S')\mid x,a]\\
+&\quad+\E[V_{t+1}(B^{a,S',O},S')-V_{t+1}(B^{a,S'},S')\mid x,a]\\
+&=A_t^a(x)+I_t^a(x).
+\end{aligned}
+\end{equation}
+Substitution proves the action-value identity. Subtracting archive from keep and defining $\Delta_t^{\rm imm}=\ell_t(\cdot,\keep)-\ell_t(\cdot,\archive)$, $\Delta_t^{\rm access}=A_t^\keep-A_t^\archive$, and $\Delta_t^{\rm info}=I_t^\keep-I_t^\archive$ proves the contrast decomposition.
+
+\subsection{Proof of Theorem~\ref{thm:score-fiber}}
+Let $p$ be the probability that the score-only rule chooses $\keep$ on the common score value in \eqref{eq:opposite-fiber}. In $x_+$, choosing $\archive$ has regret at least $m_+$, so the expected regret is at least $(1-p)m_+$. In $x_-$, choosing $\keep$ has regret at least $m_-$, so it is at least $pm_-$. Balancing the two lower bounds gives
+\begin{equation}
+\max\{(1-p)m_+,pm_-\}\ge\frac{m_+m_-}{m_++m_-},
+\end{equation}
+which proves the claim. No tie convention is needed because both margins are strict.
+
+\subsection{Proof of Theorem~\ref{thm:certificate}}
+We prove the first bound in \eqref{eq:certificate-bound} by backward induction. At $H+1$, it is exactly the terminal inequality in \eqref{eq:closure}. Suppose it holds at $r+1$. Let $P_x=(q_{r+1})_\#T_r^a(\cdot\mid x)$. The Bellman recursions, the induction hypothesis, and the definition of total variation give
+\begin{align}
+|Q_r(x,a)-\bar Q_r(q_r(x),a)|
+&\le\varepsilon_r+\gamma\left|\int V_{r+1}\,dT_r^a-\int\bar V_{r+1}\,d\bar T_r^a\right|\\
+&\le\varepsilon_r+\gamma\left(b_{r+1}+\left|\int\bar V_{r+1}\,dP_x-\int\bar V_{r+1}\,d\bar T_r^a\right|\right)\\
+&\le\varepsilon_r+\gamma\left(b_{r+1}+2M_{r+1}\eta_r\right)=b_r.
+\end{align}
+Maximization preserves the same bound for $V_r$ and $\bar V_r$, completing the induction. Applying the action-value bound once for $\keep$ and once for $\archive$ yields the contrast bound. If $\bar\Delta_r>2b_r$, then $\Delta_r>0$; if $\bar\Delta_r<-2b_r$, then $\Delta_r<0$. Thus each committed action in \eqref{eq:cert-policy} has the full-state optimal sign. The theorem makes no assertion in the remaining band.
+
+Each result row is tied to a dataset hash, command, configuration, scorer hash, model/API version, seed, failure count, and output hash. The v3 inferential unit is the unique world signature; the nine mechanism families are the bootstrap clusters. Public metrics use frozen chronological masking and the official LoCoMo scorer where commensurate. Authorized and physical storage are recorded separately. Missing metrics remain missing.
+
+\section{Additional lifecycle diagnostics}
+\label{app:diagnostics}
+The retained score-fiber representatives are SimpleMem lexical (four heterogeneous fibers, two opposite-sign fibers), FadeMem (two, two), Trivium (seven, zero), and GovMem access control (six, two). Duplicate diagnostic signatures from Oblivion, Memory Worth, DeMem, and CMI are omitted from the primary table rather than counted as independent evidence. Full component ablations, model confidence intervals, cost-normalized utility, and storage/probe sensitivity are supplied with the anonymous artifact manifest.
+
+\section{Named-baseline audit}
+\label{app:audit}
+\begin{table}[!ht]
+\caption{Reproduction ledger. Native values are transcribed from supplied papers/PDFs and are not numerically mixed with unified-contract rows. MF denotes a mechanism-faithful implementation; R-C denotes an open-weight or paper-mechanism substitute.}
+\centering\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{p{0.15\linewidth}p{0.23\linewidth}p{0.45\linewidth}p{0.09\linewidth}}
+\toprule
+Baseline & Native task/metric & Local status and boundary & Tier \\
+\midrule
+DeMem & Decision rate--distortion & Literature comparator; no local native row in this freeze & R-A \\
+SimpleMem & LoCoMo F1/BLEU/cost & Qwen3-8B open-weight substitute; unified hit 0.7051, recall 0.6524, storage 19,642.8; no native delta & R-C \\
+ActMem & LoCoMo QA accuracy & Qwen3-8B/Qwen3-Embedding MF substitute; unified hit 0.6317, recall 0.5729, storage 10,528; native accuracy not reproduced & MF \\
+Oblivion & LongMemEval-S & Official decay core verified; end-to-end path open & R-D \\
+Memory Worth & Spearman $\rho$ & Synthetic MF calibration $\rho=0.8977$ at 10k over 20 seeds; text retrieval open & MF \\
+Trivium & Temporal regret & Probe/log core only; native end-to-end path open & MF \\
+GovMem & Promotion precision/recall & Controlled simulator and noise sweep; not GovMem-Bench reproduction & R-D/E \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\end{document}

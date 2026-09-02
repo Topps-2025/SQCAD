@@ -13,6 +13,8 @@ Policies (22- 9 baseline family):
   * blind commits      -- keep_all, archive_all, random50
   * exposure heuristics -- recency2, frequency2, storage12, memory_worth
   * text-only rules    -- event_rule (lexical overlap with visible events)
+  * named surface      -- simplemem_lexical (current-query lexical relevance;
+    named SimpleMem retrieval surface, not an end-to-end reproduction)
   * scope rule         -- scope_literal
   * SQCAD variants     -- sqcad_cert (NEGATIVE/MISMATCH -> archive, else
                           keep), sqcad_cert_conflict (+ lineage conflict ->
@@ -116,6 +118,18 @@ def p_event_rule(ep: RealizedEpisode) -> str:
     return "archive" if _event_overlap(ep) >= REQUALIFY_OVERLAP else "keep"
 
 
+def p_simplemem_lexical(ep: RealizedEpisode) -> str:
+    """Named SimpleMem retrieval surface under the lifecycle contract.
+
+    The full SimpleMem system is evaluated separately on public QA.  This
+    control transports only its observable lexical relevance signal to the
+    keep/archive decision: current decision-query overlap is sufficient to
+    keep, otherwise archive.  It reads no future item or hidden needed id.
+    """
+    return ("keep" if overlap(_decision_tokens(ep), ep.decision_task.tokens)
+            >= ADOPT_THRESHOLD else "archive")
+
+
 def p_scope_literal(ep: RealizedEpisode) -> str:
     """Scope-transport heuristic: archive iff some future task moves to a
     scope different from the decision scope (the memory's value would have
@@ -166,6 +180,7 @@ DECISION_POLICIES: Dict[str, Callable[[RealizedEpisode], str]] = {
     "storage12": p_storage12,
     "memory_worth": p_memory_worth,
     "event_rule": p_event_rule,
+    "simplemem_lexical": p_simplemem_lexical,
     "scope_literal": p_scope_literal,
     "sqcad_cert": p_sqcad_cert,
     "sqcad_cert_conflict": p_sqcad_cert_conflict,
@@ -258,6 +273,36 @@ def run_ablation_matrix(episodes: Sequence[RealizedEpisode],
             a = p_sqcad_cert(ep)
             v = branch_value(ep, a, cfg)
             vals.append(episode_result(ep, a, hidden[ep.world.episode_id], v))
+        n = len(vals)
+        out[name] = {
+            "mean_value": round(sum(r["value"] for r in vals) / n, 4),
+            "mean_regret": round(sum(r["regret"] for r in vals) / n, 4),
+            "false_commit_rate": round(
+                sum(1 for r in vals if r["false_commit"]) / n, 4),
+            "missed_commit_rate": round(
+                sum(1 for r in vals if r["missed_commit"]) / n, 4),
+        }
+    return out
+
+
+def run_primary_ablation_matrix(
+        episodes: Sequence[RealizedEpisode],
+        hidden: Dict[str, EpisodeOutcome]) -> Dict[str, Any]:
+    """Ablate follow-on components while fixing the current primary action.
+
+    The legacy ablation matrix intentionally anchors the older ``sqcad_cert``
+    decision.  This companion matrix keeps the lineage-conflict-aware action
+    fixed, so a zero effect is an honest indication that a component was not
+    activated by the frozen mechanism family rather than a policy mismatch.
+    """
+    out: Dict[str, Any] = {}
+    for name, cfg in ABLATIONS.items():
+        vals = []
+        for ep in episodes:
+            action = p_sqcad_cert_conflict(ep)
+            value = branch_value(ep, action, cfg)
+            vals.append(episode_result(
+                ep, action, hidden[ep.world.episode_id], value))
         n = len(vals)
         out[name] = {
             "mean_value": round(sum(r["value"] for r in vals) / n, 4),

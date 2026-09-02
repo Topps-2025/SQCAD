@@ -29,6 +29,7 @@ and the paper keeps the constructive-possibility framing (plan section 5.4).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from collections import Counter, defaultdict
@@ -52,6 +53,14 @@ STORAGE_RATE = 0.01
 EXPOSURE_UNIT = 0.05
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 @dataclass(frozen=True)
 class TraceView:
     """Decision-time visible features of one memory row. No future access."""
@@ -60,6 +69,7 @@ class TraceView:
     text: str
     storage_tokens: int
     age: int                    # rows seen after it, at decision time
+    normalized_age: float       # age divided by observed stream span
     past_mentions: int          # past tasks whose query overlapped it
     past_demand: float          # discounted past demand (NOT future)
     past_relevance: float       # mean overlap with past queries
@@ -95,6 +105,7 @@ def build_trace_view(msg: TraceMsg, msgs: Sequence[TraceMsg],
         text=msg.content,
         storage_tokens=len(msg.tokens),
         age=len(msgs) - 1 - idx,
+        normalized_age=(len(msgs) - 1 - idx) / max(len(msgs) - 1, 1),
         past_mentions=mentions,
         past_demand=demand,
         past_relevance=(sum(rels) / len(rels)) if rels else 0.0,
@@ -117,7 +128,7 @@ def _simplemem_lexical(v: TraceView) -> float:
 
 
 def _recency(v: TraceView) -> float:
-    return float(GAMMA ** v.age)
+    return float(GAMMA ** v.normalized_age)
 
 
 def _bm25(v: TraceView) -> float:
@@ -130,7 +141,7 @@ def _memory_worth(v: TraceView) -> float:
 
 
 def _fademem(v: TraceView) -> float:
-    return float(v.local_relevance * (GAMMA ** v.age))
+    return float(v.local_relevance * (GAMMA ** v.normalized_age))
 
 
 def _demem(v: TraceView) -> float:
@@ -252,6 +263,94 @@ def paired_delta(msgs: Sequence[TraceMsg], future: Sequence[TraceTask],
     }
 
 
+def prepare_suffix_rollout(msgs: Sequence[TraceMsg],
+                           future: Sequence[TraceTask],
+                           budget: int) -> Dict[str, object]:
+    """Precompute the candidate-independent keep branch of paired rollouts.
+
+    The archive branch must still be rescored per target because ``bm25_scores``
+    derives N, document frequencies, and average document length from its input
+    pool.  Reusing only the keep branch is exact and removes half of the repeated
+    BM25 work without assuming that filtering a full-pool ranking is equivalent.
+    """
+    slots = []
+    for task in future:
+        scores = bm25_scores(msgs, task.query_tokens)
+        ranked = sorted(msgs,
+                        key=lambda msg: (-scores.get(msg.msg_id, 0.0), msg.msg_id))
+        slots.append({"task": task, "scores": scores,
+                      "keep_workspace": [m.msg_id for m in ranked[:budget]]})
+    return {"slots": slots, "budget": budget,
+            "total_storage_tokens": sum(len(m.tokens) for m in msgs),
+            "by_id": {m.msg_id: m for m in msgs},
+            "msgs": tuple(msgs)}
+
+
+def paired_delta_precomputed(prepared: Mapping[str, object],
+                             target: str) -> Dict[str, object]:
+    """Exact fast path for :func:`paired_delta` over a prepared suffix."""
+    budget = int(prepared["budget"])
+    by = prepared["by_id"]
+    tgt = by[target]
+    msgs = prepared["msgs"]
+    archive_pool = [m for m in msgs if m.msg_id != target]
+    total_storage = int(prepared["total_storage_tokens"])
+    vk = va = rk = ra = 0.0
+    differing: List[int] = []
+    probes_paid = probes_restored = future_needing = 0
+    for slot, data in enumerate(prepared["slots"]):
+        task = data["task"]
+        scores = data["scores"]
+        keep_ids = list(data["keep_workspace"])
+        archive_scores = bm25_scores(archive_pool, task.query_tokens)
+        archive_ranked = sorted(
+            archive_pool,
+            key=lambda msg: (-archive_scores.get(msg.msg_id, 0.0), msg.msg_id),
+        )
+        archive_ids = [m.msg_id for m in archive_ranked[:budget]]
+        probe = 0.0
+        restored = False
+        if PROBE_BUDGET_PER_TASK > 0 and _ov(tgt.tokens, task.query_tokens) >= PROBE_THRESHOLD:
+            probe = PROBE_COST
+            probes_paid += 1
+            floor = min((scores.get(mid, 0.0) for mid in archive_ids), default=0.0)
+            if scores.get(target, 0.0) > floor:
+                restored = True
+                probes_restored += 1
+                archive_ids = (archive_ids[:-1] + [target]
+                               if archive_ids else [target])
+        need = set(task.needed_ids)
+        future_needing += int(target in need)
+        keep_cov = len(need & set(keep_ids)) / max(len(need), 1)
+        archive_cov = len(need & set(archive_ids)) / max(len(need), 1)
+        keep_retrieval = TASK_VALUE * keep_cov - EXPOSURE_UNIT * len(keep_ids)
+        archive_retrieval = (TASK_VALUE * archive_cov
+                             - EXPOSURE_UNIT * len(archive_ids) - probe)
+        discount = GAMMA ** slot
+        rk += discount * keep_retrieval
+        ra += discount * archive_retrieval
+        vk += discount * (keep_retrieval - STORAGE_RATE * total_storage)
+        va += discount * (archive_retrieval
+                          - STORAGE_RATE * (total_storage - len(tgt.tokens)))
+        if (tuple(keep_ids), 0.0) != (tuple(archive_ids), probe):
+            differing.append(slot)
+    return {
+        "delta": vk - va,
+        "delta_retrieval": rk - ra,
+        "value_keep": vk,
+        "value_archive": va,
+        "n_probes_paid": probes_paid,
+        "n_probes_restored": probes_restored,
+        "kernel_changed": bool(differing),
+        "differing_slots": differing,
+        "value_relevant": abs(vk - va) > TAU_TOL,
+        "n_future_needing_target": future_needing,
+        "target_storage_tokens": len(tgt.tokens),
+        "storage_discount_sum": sum(
+            GAMMA ** slot for slot in range(len(prepared["slots"]))),
+    }
+
+
 def fiber_summary(rows: Sequence[Mapping[str, object]], digits: int,
                   key: str = "delta") -> Dict[str, object]:
     """Group rows by exact rounded score; find opposite-sign Delta pairs.
@@ -346,7 +445,8 @@ def fiber_summary(rows: Sequence[Mapping[str, object]], digits: int,
 
 
 def audit_trace_rows(trace: Trace, budget: int, max_candidates: int,
-                     min_future: int) -> List[Dict[str, object]]:
+                     min_future: int,
+                     candidate_mode: str = "label-independent") -> List[Dict[str, object]]:
     """Paired intervention over candidate rows at a mid-stream decision point."""
     msgs, tasks = list(trace.msgs), list(trace.tasks)
     if len(tasks) < min_future + 1:
@@ -356,19 +456,17 @@ def audit_trace_rows(trace: Trace, budget: int, max_candidates: int,
     if len(future) < min_future:
         return []
 
-    # Candidates: rows some future task needs, plus top-BM25 distractors.
-    needed = {mid for t in future for mid in t.needed_ids}
+    # Future needed_ids are outcome labels and cannot select the candidate
+    # universe.  The default pool is a deterministic decision-time ranking;
+    # full-pool sensitivity is explicit and logged.
     bm25 = bm25_scores(msgs, decision.query_tokens)
-    by = by_id(trace)
-    cands = [by[m] for m in sorted(needed) if m in by]
-    extra = sorted((m for m in msgs if m.msg_id not in needed),
-                   key=lambda m: (-bm25.get(m.msg_id, 0.0), m.msg_id))
-    cands += extra[:max(0, max_candidates - len(cands))]
-    cands = cands[:max_candidates]
+    ranked = sorted(msgs, key=lambda m: (-bm25.get(m.msg_id, 0.0), m.msg_id))
+    cands = ranked if candidate_mode == "full" else ranked[:max_candidates]
 
+    prepared = prepare_suffix_rollout(msgs, future, budget)
     rows: List[Dict[str, object]] = []
     for m in cands:
-        pr = paired_delta(msgs, future, m.msg_id, budget)
+        pr = paired_delta_precomputed(prepared, m.msg_id)
         view = build_trace_view(m, msgs, past, decision, bm25)
         for name, _lvl, fn in SURFACES:
             rows.append({
@@ -388,6 +486,8 @@ def main() -> None:
     p.add_argument("--max-candidates", type=int, default=14)
     p.add_argument("--min-future", type=int, default=3)
     p.add_argument("--score-digits", type=int, default=8)
+    p.add_argument("--candidate-mode", choices=("label-independent", "full"),
+                   default="label-independent")
     a = p.parse_args()
 
     loader = load_longmemeval_s if a.dataset == "longmemeval_s" else load_locomo
@@ -397,7 +497,8 @@ def main() -> None:
     all_rows: List[Dict[str, object]] = []
     skipped = 0
     for i, tr in enumerate(traces, 1):
-        r = audit_trace_rows(tr, a.budget, a.max_candidates, a.min_future)
+        r = audit_trace_rows(tr, a.budget, a.max_candidates, a.min_future,
+                             a.candidate_mode)
         if not r:
             skipped += 1
         all_rows.extend(r)
@@ -458,13 +559,21 @@ def main() -> None:
     out = {
         "gate": "G-2",
         "dataset": a.dataset,
+        "dataset_path": str(a.path),
+        "dataset_sha256": _sha256_file(a.path),
+        "runner_sha256": _sha256_file(Path(__file__).resolve()),
+        "canonical_real_trace_evidence": bool(
+            (not inapplicable) and a.dataset == "locomo"),
+        "bounded_existence_only": True,
         "protocol_applicable": not inapplicable,
         "protocol": "forced keep/archive paired intervention on real traces; "
                     "46- protocol ported off LifecycleBench",
+        "protocol_version": "g2-label-independent-normalized-age-v1",
         "honesty_notes": [
             "all surfaces read decision-time-visible features only",
             "archive keeps the row retrievable at PROBE_COST (not zero-information)",
             "fibers are exact equality after rounding to score_digits",
+            "recency and fademem use stream-span-normalized age; raw exponential underflow is not a witness",
             "trivium uses PAST demand only (future demand would leak the label)",
             "probes are BUDGETED (PROBE_BUDGET_PER_TASK), THRESHOLDED "
             "(PROBE_THRESHOLD) and charged even when wasted; an archived row "
@@ -485,10 +594,19 @@ def main() -> None:
         "caps": {"traces_requested": a.limit, "traces_loaded": len(traces),
                  "traces_skipped_too_few_tasks": skipped,
                  "max_candidates_per_trace": a.max_candidates,
+                 "candidate_mode": a.candidate_mode,
                  "workspace_budget": a.budget, "min_future_tasks": a.min_future},
+        "execution": {
+            "score_digits": a.score_digits,
+            "protocol_version": "g2-label-independent-normalized-age-v1",
+            "future_needed_ids_used_for_candidate_selection": False,
+            "future_needed_ids_used_for_final_utility": True,
+        },
         "params": {"gamma": GAMMA, "tau_tol": TAU_TOL, "task_value": TASK_VALUE,
                    "probe_cost": PROBE_COST, "storage_rate": STORAGE_RATE,
-                   "exposure_unit": EXPOSURE_UNIT},
+                   "exposure_unit": EXPOSURE_UNIT,
+                   "recency_age": "stream-span-normalized",
+                   "candidate_selection": a.candidate_mode},
         "n_rows_total": len(all_rows),
         "primary_contrast": "delta_retrieval",
         "per_surface": per_surface,

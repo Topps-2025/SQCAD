@@ -1,0 +1,12 @@
+{
+  "baseline_summary": "baseline_summary.json",
+  "hidden": "hidden.jsonl",
+  "n_independent_worlds": 225,
+  "policy_rows": "policy_rows.jsonl",
+  "public": "public.jsonl",
+  "scorer": "score.py",
+  "source_contract": "src/sqcad/lifecycle_bench",
+  "version": "v3.0",
+  "world_signature_unique_rate": 1.0,
+  "worlds": "worlds.jsonl"
+}

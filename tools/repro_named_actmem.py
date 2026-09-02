@@ -112,7 +112,8 @@ class VLLMClient:
     def __init__(self, base_url: str, model: str,
                  cache: "StageCache | None" = None) -> None:
         from openai import OpenAI
-        self._c = OpenAI(api_key="EMPTY", base_url=base_url)
+        self._c = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "EMPTY"),
+                         base_url=base_url)
         self.model = model
         self.calls = 0
         self.in_chars = 0

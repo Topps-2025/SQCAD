@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sqcad"
-version = "0.1.0"
+version = "0.2.0"
 description = "Scope-Qualified Competitive Access Decay for evidence-governed Agent Memory."
 readme = "README.md"
 requires-python = ">=3.10"

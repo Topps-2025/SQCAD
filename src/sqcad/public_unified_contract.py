@@ -93,7 +93,9 @@ ALPHA = 0.05
 
 R1_POLICIES = (
     "no_memory", "keep_all", "fifo", "lru", "recency", "fixed_decay",
-    "frequency_decay", "bm25", "dense", "rrf",
+    "frequency_decay", "bm25", "bm25_answerability",
+    "bm25_answerability_structured",
+    "bm25_answerability_abstain", "dense", "rrf",
 )
 R2_POLICIES = ("association_only", "memory_worth", "causal_item",
                "bundle_control", "risk_gated_decomp_abstract")
@@ -106,10 +108,46 @@ SQCAD_ABLATIONS = (
 )
 SQCAD_VARIANTS = (
     "sqcad_candidate_guard_1", "sqcad_candidate_guard_2",
-    "sqcad_candidate_guard_4",
+    "sqcad_candidate_guard_4", "sqcad_candidate_guard_8",
+    "sqcad_candidate_guard_16", "sqcad_candidate_guard_full",
+    "sqcad_candidate_guard_adaptive", "sqcad_dense_guard_4",
+    "sqcad_hybrid_guard_4", "sqcad_hybrid_guard_4_reserve_1",
+    "sqcad_denoise_guard_4", "sqcad_denoise_guard_8",
+    "sqcad_denoise_guard_16", "sqcad_denoise_compact_guard_4",
+    "sqcad_denoise_compact_guard_16",
+    "sqcad_denoise_compact1k_guard_16",
+    "sqcad_denoise_compact280_guard_16",
+    "sqcad_denoise_compact300_guard_16",
+    "sqcad_denoise_guard_full",
+    "sqcad_denoise_guard_32",
+    "sqcad_denoise_nosmooth_guard_16", "sqcad_denoise_nodiverse_guard_16",
+    "sqcad_fir_denoise_guard_16",
+    "sqcad_fir_denoise_abstain_16",
+    "sqcad_fir_denoise_expand_16",
+    "sqcad_fir_structured_16",
+    "sqcad_fir_structured_overlap_16",
+    "sqcad_fir_structured_compact_1536",
+    "sqcad_fir_structured_compact_1280",
+    "sqcad_fir_denoise_guard_full",
+    "sqcad_fir_denoise_overlap_16",
+    "sqcad_fir_denoise_reader_v2_16",
+    "sqcad_denoise_adaptive",
+)
+NAMED_BASELINE_POLICIES = (
+    "simplemem_rc", "actmem_rc", "oblivion_rd", "memoryworth_rw",
+    "trivium_rd", "govmem_rg",
 )
 ALL_POLICIES = (R1_POLICIES + R2_POLICIES + ("sqcad",)
-                + SQCAD_ABLATIONS + SQCAD_VARIANTS)
+                + SQCAD_ABLATIONS + SQCAD_VARIANTS + NAMED_BASELINE_POLICIES)
+
+NAMED_BASELINE_ALIASES = {
+    "simplemem_rc": "bm25",
+    "actmem_rc": "dense",
+    "oblivion_rd": "fixed_decay",
+    "memoryworth_rw": "frequency_decay",
+    "trivium_rd": "association_only",
+    "govmem_rg": "risk_gated_decomp_abstract",
+}
 
 SENT_RE = re.compile(r"(?<=[.!?])\s+")
 
@@ -157,6 +195,20 @@ POLICY_SPECS: Dict[str, PolicySpec] = {
                        "transportable",
                        "K1=1.5, B=0.75 (official); storage cost = index-"
                        "everything"),
+    "bm25_answerability": PolicySpec(
+        "BM25 retrieval (shared answerability readout)", "1-simple-controls",
+        "query-time BM25 top-BUDGET with the same observable sentence readout "
+        "used by the SQCAD main row",
+        "transportable", "fair reader-matched control; index-everything storage"),
+    "bm25_answerability_structured": PolicySpec(
+        "BM25 retrieval (structured answerability readout)", "1-simple-controls",
+        "query-time BM25 top-BUDGET with question-echo suppression and the "
+        "same structured readout used by the SQCAD structured variant",
+        "transportable", "fair reader-matched control; index-everything storage"),
+    "bm25_answerability_abstain": PolicySpec(
+        "BM25 retrieval (answerability + abstention)", "1-simple-controls",
+        "BM25 with the shared answerability readout and zero-signal abstention",
+        "transportable", "fair reader-matched abstention control"),
     "dense": PolicySpec("Dense retrieval (MiniLM)", "1-simple-controls",
                         "query-time all-MiniLM-L6-v2 cosine top-BUDGET",
                         "transportable",
@@ -219,14 +271,174 @@ POLICY_SPECS: Dict[str, PolicySpec] = {
             ("sqcad_candidate_guard_1", 1),
             ("sqcad_candidate_guard_2", 2),
             ("sqcad_candidate_guard_4", 4),
+            ("sqcad_candidate_guard_8", 8),
+            ("sqcad_candidate_guard_16", 16),
+            ("sqcad_candidate_guard_full", 10**9),
         )
     },
+    "sqcad_candidate_guard_adaptive": PolicySpec(
+        "SQCAD + adaptive candidate coverage guard",
+        "framework-variant",
+        "observable retained/archive BM25 margin selects 2, 8, or 16 "
+        "one-shot candidate proposals; no persistent authorization",
+        "transportable",
+        "pre-registered adaptive budget: 2 when retained evidence is at "
+        "least as strong, 8 when archive evidence is stronger, and 16 "
+        "when retained evidence is absent but archive evidence is positive"),
     "sqcad_candidate_guard": PolicySpec(
         "SQCAD + candidate coverage guard (4; legacy alias)",
         "framework-variant",
         "Compatibility alias for sqcad_candidate_guard_4",
         "transportable",
         "legacy name; equivalent to four candidate proposals per QA"),
+    "sqcad_dense_guard_4": PolicySpec(
+        "SQCAD + dense candidate guard (4)", "framework-variant",
+        "SQCAD plus four one-shot candidates from a frozen dense cache; "
+        "persistent authorization unchanged",
+        "transportable", "Qwen3-Embedding cache is an open-weight retrieval "
+        "substitute; no generation/compression stage"),
+    "sqcad_hybrid_guard_4": PolicySpec(
+        "SQCAD + hybrid lexical+dense candidate guard (4)",
+        "framework-variant",
+        "SQCAD plus four one-shot candidates from reciprocal-rank union of "
+        "observable BM25 and dense candidates; persistent authorization "
+        "unchanged",
+        "transportable", "Qwen3-Embedding cache is an open-weight retrieval "
+        "substitute; no generation/compression stage"),
+    "sqcad_hybrid_guard_4_reserve_1": PolicySpec(
+        "SQCAD + hybrid guard-4 + one candidate reserve", "framework-variant",
+        "SQCAD plus four RRF candidate proposals and one reserved workspace "
+        "slot for the highest-ranked proposal; persistent authorization "
+        "unchanged",
+        "transportable", "pre-registered rerank/workspace intervention; "
+        "Qwen3-Embedding cache is an open-weight retrieval substitute"),
+    "sqcad_denoise_guard_4": PolicySpec(
+        "SQCAD + denoising guard-4", "framework-variant",
+        "SQCAD plus query-signal smoothing and redundancy-suppressed "
+        "candidate ranking; proposals do not authorize persistent writes",
+        "transportable", "fixed DSP-inspired smoothing and MMR-style "
+        "evidence diversity; no evaluator gold or learned parameters"),
+    "sqcad_denoise_guard_8": PolicySpec(
+        "SQCAD + denoising guard-8", "framework-variant",
+        "SQCAD plus eight denoised candidate proposals with redundancy "
+        "suppression; proposals do not authorize persistent writes",
+        "transportable", "same fixed query-time denoiser with a larger "
+        "candidate budget"),
+    "sqcad_denoise_guard_16": PolicySpec(
+        "SQCAD + denoising guard-16", "framework-variant",
+        "SQCAD plus sixteen denoised candidate proposals with redundancy "
+        "suppression; proposals do not authorize persistent writes",
+        "transportable", "same fixed query-time denoiser with a larger "
+        "candidate budget"),
+    "sqcad_denoise_guard_full": PolicySpec(
+        "SQCAD + full-candidate denoising guard", "framework-variant",
+        "All observable candidates are proposed, then ranked by graph "
+        "denoising and redundancy suppression; no persistent authorization",
+        "transportable", "diagnostic coverage upper bound; probe cost is "
+        "reported and not treated as free"),
+    "sqcad_denoise_guard_32": PolicySpec(
+        "SQCAD + denoising guard-32", "framework-variant",
+        "SQCAD plus thirty-two denoised candidate proposals with "
+        "redundancy suppression",
+        "transportable", "fixed candidate budget; probe cost is reported"),
+    "sqcad_denoise_nosmooth_guard_16": PolicySpec(
+        "SQCAD + denoising (no graph smoothing)", "framework-ablation",
+        "Diversity-only ranking with graph low-pass disabled",
+        "transportable", "isolates the consensus low-pass contribution"),
+    "sqcad_denoise_nodiverse_guard_16": PolicySpec(
+        "SQCAD + denoising (no diversity penalty)", "framework-ablation",
+        "Graph-smoothed ranking with redundancy suppression disabled",
+        "transportable", "isolates the MMR evidence-diversity contribution"),
+    "sqcad_fir_denoise_guard_16": PolicySpec(
+        "SQCAD + temporal FIR denoising guard-16", "framework-variant",
+        "Fixed three-tap temporal low-pass filter, answerability readout, "
+        "and redundancy suppression; proposals do not authorize persistent writes",
+        "transportable", "kernel [0.25, 0.50, 0.25] and IDF/type-aware readout "
+        "are fixed before evaluation"),
+    "sqcad_fir_denoise_guard_full": PolicySpec(
+        "SQCAD + FIR + answerability (full candidate diagnostic)",
+        "framework-variant",
+        "Full observable candidate guard followed by the main FIR and "
+        "answerability readout; persistent authorization unchanged",
+        "transportable", "coverage upper bound; proposal/probe cost is reported"),
+    "sqcad_fir_denoise_expand_16": PolicySpec(
+        "SQCAD + FIR + adjacent evidence expansion (16)",
+        "framework-variant",
+        "Hybrid seeds plus a bounded same-session temporal-neighborhood "
+        "proposal before FIR denoising; persistent authorization unchanged",
+        "transportable", "radius-one adjacency is structural and gold-free; "
+        "proposal cost is reported"),
+    "sqcad_fir_structured_16": PolicySpec(
+        "SQCAD + structured response-prior FIR (16)", "framework-variant",
+        "Hybrid candidate guard augmented with observable next-turn response "
+        "edges, followed by FIR, MMR and structured answerability readout",
+        "transportable", "response edges use only session order, punctuation, "
+        "and visible text; no evaluator gold or answer fields"),
+    "sqcad_fir_structured_overlap_16": PolicySpec(
+        "SQCAD + structured response-prior FIR (overlap readout)",
+        "framework-ablation",
+        "The structured response-prior access layer with the original "
+        "overlap-only reader", "transportable",
+        "isolates candidate recovery from structured readout"),
+    "sqcad_fir_structured_compact_1536": PolicySpec(
+        "SQCAD + structured response-prior FIR (1536-token cap)",
+        "framework-variant",
+        "Structured response-prior FIR with a fixed query-time exposure cap",
+        "transportable",
+        "cap is applied only to exposed workspace/context; persistent storage "
+        "and candidate proposals are unchanged"),
+    "sqcad_fir_structured_compact_1280": PolicySpec(
+        "SQCAD + structured response-prior FIR (1280-token cap)",
+        "framework-variant",
+        "Structured response-prior FIR with a stricter fixed query-time exposure cap",
+        "transportable",
+        "cap is applied only to exposed workspace/context; persistent storage "
+        "and candidate proposals are unchanged"),
+    "sqcad_fir_denoise_overlap_16": PolicySpec(
+        "SQCAD + temporal FIR (overlap readout)", "framework-ablation",
+        "FIR access with the original overlap-only sentence reader",
+        "transportable", "readout ablation; persistent authorization unchanged"),
+    "sqcad_fir_denoise_reader_v2_16": PolicySpec(
+        "SQCAD + temporal FIR + answerability readout", "framework-variant",
+        "FIR-denoised access followed by observable IDF/type-aware sentence "
+        "readout; persistent authorization is unchanged",
+        "transportable", "readout uses query terms and explicit temporal/count "
+        "forms only; no evaluator gold or learned parameters"),
+    "sqcad_denoise_adaptive": PolicySpec(
+        "SQCAD + adaptive denoising guard", "framework-variant",
+        "Adaptive 2/8/16 candidate guard followed by graph denoising and "
+        "redundancy suppression",
+        "transportable", "budget uses retained/archive score margin only; "
+        "no future labels"),
+    "sqcad_denoise_compact_guard_4": PolicySpec(
+        "SQCAD + compact denoising guard-4", "framework-variant",
+        "Denoising guard with a fixed 512-token exposure budget",
+        "transportable", "same qualification and candidate stream as "
+        "denoise guard-4; context budget is priced separately"),
+    "sqcad_denoise_compact_guard_16": PolicySpec(
+        "SQCAD + compact denoising guard-16", "framework-variant",
+        "Denoising guard with sixteen proposals and a fixed 512-token "
+        "exposure budget",
+        "transportable", "same denoiser and qualification; context budget "
+        "is priced separately"),
+    "sqcad_denoise_compact1k_guard_16": PolicySpec(
+        "SQCAD + denoising guard-16 (1k-token context)", "framework-variant",
+        "Denoising guard with sixteen proposals and a fixed 1024-token "
+        "exposure budget",
+        "transportable", "same denoiser and qualification; context budget "
+        "is priced separately"),
+    "sqcad_denoise_compact280_guard_16": PolicySpec(
+        "SQCAD + denoising guard-16 (280-token context)", "framework-variant",
+        "Denoising guard with sixteen proposals and a fixed 280-token "
+        "exposure budget",
+        "transportable", "same denoiser and qualification; context budget "
+        "is priced separately"),
+    "sqcad_denoise_compact300_guard_16": PolicySpec(
+        "SQCAD + denoising guard-16 (300-token context)", "framework-variant",
+        "Denoising guard with sixteen proposals and a fixed 300-token "
+        "exposure budget",
+        "transportable", "same denoiser and qualification; context budget "
+        "is priced separately"),
     **{ab: PolicySpec(
         "SQCAD ablation: " + ab.removeprefix("sqcad_").replace("_", " "),
         "framework-ablation",
@@ -234,6 +446,33 @@ POLICY_SPECS: Dict[str, PolicySpec] = {
         "transportable", "same contract, one toggle off")
        for ab in SQCAD_ABLATIONS},
 }
+
+POLICY_SPECS.update({
+    "simplemem_rc": PolicySpec(
+        "SimpleMem-RC (lexical/compression proxy)", "named-baseline",
+        "BM25 top-BUDGET over the shared chronological stream",
+        "proxy", "native write-time compression is not transported"),
+    "actmem_rc": PolicySpec(
+        "ActMem-RC (dense/graph proxy)", "named-baseline",
+        "Qwen3-Embedding-0.6B dense top-BUDGET",
+        "proxy", "native graph consolidation is not transported"),
+    "oblivion_rd": PolicySpec(
+        "Oblivion-RD (decay-core proxy)", "named-baseline",
+        "fixed exponential recency decay",
+        "proxy", "LLM uncertainty tier is not transported"),
+    "memoryworth_rw": PolicySpec(
+        "MemoryWorth-RW (worth proxy)", "named-baseline",
+        "observable frequency-decay score",
+        "proxy", "future outcome labels are not exposed"),
+    "trivium_rd": PolicySpec(
+        "Trivium-RD (demand proxy)", "named-baseline",
+        "observable association/demand score",
+        "proxy", "interactive probe oracle is not transported"),
+    "govmem_rg": PolicySpec(
+        "GovMem-RG (risk-governance proxy)", "named-baseline",
+        "observable risk-gated qualification",
+        "proxy", "write-time native controller is not transported"),
+})
 
 # ---------------------------------------------------------------------------
 # chronological mask + gold isolation
@@ -394,6 +633,26 @@ class PolicyResult:
     lifecycle: Dict[str, int] = field(default_factory=lambda: {
         "archives": 0, "restores": 0, "probes": 0, "fallbacks": 0})
     rows: List[Dict] = field(default_factory=list)
+    # Optional query-time packed text.  Message IDs remain unchanged for
+    # evidence auditing, while denoising variants may expose only salient
+    # sentences to the reader and pay their actual token count.
+    context_texts: Dict[str, Tuple[str, ...]] = field(default_factory=dict)
+    # Reader scoring mode is part of the frozen policy artifact so access and
+    # readout variants cannot be conflated in a result table.
+    reader_mode: str = "overlap"
+    # ``storage_tokens`` is the currently authorized/retained set.  Physical
+    # storage is a separate axis because SQCAD archives remain readable by
+    # probe, fallback, and candidate-guard paths.  Legacy engines default to
+    # retained-only semantics; governance engines must opt into archive-
+    # readable accounting explicitly.
+    physical_storage_tokens: Optional[int] = None
+    physical_storage_semantics: str = "retained_only"
+
+    def __post_init__(self) -> None:
+        if self.physical_storage_tokens is None:
+            self.physical_storage_tokens = self.storage_tokens
+        if self.physical_storage_tokens < self.storage_tokens:
+            raise ValueError("physical storage cannot be below authorized storage")
 
 
 def _static_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
@@ -416,7 +675,7 @@ def _static_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
 def _retrieval_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
                       retriever: Callable[[Sequence[TraceMsg], Sequence[str]],
                                           Dict[str, float]],
-                      policy: str) -> PolicyResult:
+                      policy: str, reader_mode: str = "overlap") -> PolicyResult:
     out: Dict[str, Tuple[str, ...]] = {}
     for t in tasks:
         scores = retriever(msgs, t.query_tokens)
@@ -427,6 +686,7 @@ def _retrieval_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
         storage_ids=tuple(m.msg_id for m in msgs),  # index-everything
         storage_tokens=sum(len(m.tokens) for m in msgs),
         lifecycle={"archives": 0, "restores": 0, "probes": 0, "fallbacks": 0},
+        reader_mode=reader_mode,
     )
 
 
@@ -507,6 +767,199 @@ class SqcadConfig:
     fallback: bool = True
     candidate_guard: bool = False
     candidate_guard_budget: int = 0
+    adaptive_candidate_guard: bool = False
+    candidate_source: str = "lexical"
+    candidate_reserve: int = 0
+    candidate_expansion: bool = False
+    response_prior: bool = False
+    denoise: bool = False
+    context_token_budget: int = 0
+    graph_smoothing: bool = True
+    diversity_penalty: bool = True
+    temporal_fir: bool = False
+    reader_mode: str = "overlap"
+
+
+def _jaccard(a: set, b: set) -> float:
+    """Token-support overlap used only for query-time redundancy control."""
+    union = a | b
+    return len(a & b) / len(union) if union else 0.0
+
+
+def _denoise_rank(ids: Sequence[str], scores: Dict[str, float],
+                  toks: Dict[str, set], by: Dict[str, TraceMsg],
+                  token_budget: int = 0, graph_smoothing: bool = True,
+                  diversity_penalty: bool = True,
+                  temporal_fir: bool = False) -> List[str]:
+    """Select a diverse evidence set from a fixed candidate pool.
+
+    The first term is a conservative local smoothing of the query signal:
+    an item receives support only from a lexical neighbour in a different
+    session.  The second term is greedy MMR, which prevents repeated turns
+    from consuming the workspace.  Both operations are query-time only and
+    cannot authorize persistent storage.
+    """
+    if not ids:
+        return []
+    support: Dict[str, float] = {}
+    lowpass: Dict[str, float] = {}
+    for mid in ids:
+        neighbours = [
+            (other, _jaccard(toks[mid], toks[other]))
+            for other in ids if other != mid
+            and by[other].session_id != by[mid].session_id
+        ]
+        total_w = sum(w for _, w in neighbours)
+        support[mid] = (total_w / len(neighbours)) if neighbours else 0.0
+        # One-step graph low-pass: retain the query signal while borrowing
+        # only consensus from independent sessions.  The high-pass residual
+        # is kept as a small penalty so isolated lexical spikes are treated
+        # as noise rather than rewarded by the gate.
+        neighbour_mean = (sum(w * scores[other] for other, w in neighbours)
+                          / total_w) if total_w else scores[mid]
+        lowpass[mid] = 0.82 * scores[mid] + 0.18 * neighbour_mean
+    if temporal_fir:
+        ordered = sorted(ids, key=lambda mid: (by[mid].date_idx, mid))
+        for i, mid in enumerate(ordered):
+            left = scores[ordered[i - 1]] if i else scores[mid]
+            right = scores[ordered[i + 1]] if i + 1 < len(ordered) else scores[mid]
+            lowpass[mid] = 0.25 * left + 0.50 * scores[mid] + 0.25 * right
+        smoothed = {
+            mid: lowpass[mid] - 0.08 * abs(scores[mid] - lowpass[mid])
+            for mid in ids
+        }
+    elif graph_smoothing:
+        smoothed = {
+            mid: lowpass[mid] - 0.04 * abs(scores[mid] - lowpass[mid])
+            + 0.08 * support[mid]
+            for mid in ids
+        }
+    else:
+        smoothed = dict(scores)
+    selected: List[str] = []
+    remaining = set(ids)
+    used_tokens = 0
+    # lambda is fixed before evaluation; relevance remains dominant while
+    # repeated/near-duplicate turns are explicitly down-weighted.
+    relevance_weight = 0.78
+    while remaining and len(selected) < BUDGET:
+        ranked = []
+        for mid in remaining:
+            redundancy = max((_jaccard(toks[mid], toks[other])
+                              for other in selected), default=0.0)
+            penalty = redundancy if diversity_penalty else 0.0
+            mmr = (relevance_weight * smoothed[mid]
+                   - (1.0 - relevance_weight) * penalty)
+            ranked.append((mmr, smoothed[mid], mid))
+        ranked.sort(key=lambda x: (-x[0], -x[1], x[2]))
+        chosen = None
+        for _, _, mid in ranked:
+            n_tokens = len(by[mid].tokens)
+            if token_budget and selected and used_tokens + n_tokens > token_budget:
+                continue
+            if token_budget and not selected and n_tokens > token_budget:
+                continue
+            chosen = mid
+            break
+        if chosen is None:
+            break
+        selected.append(chosen)
+        remaining.remove(chosen)
+        used_tokens += len(by[chosen].tokens)
+    return selected
+
+
+_READER_STOPWORDS = {
+    "a", "an", "the", "and", "or", "of", "to", "in", "on", "for",
+    "is", "are", "was", "were", "be", "been", "did", "do", "does",
+    "what", "when", "where", "who", "why", "how", "which", "would",
+    "could", "should", "can", "will", "has", "have", "had", "it",
+    "this", "that", "they", "them", "he", "she", "we", "you", "i",
+}
+_DATE_OR_TIME_RE = re.compile(
+    r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+    r"january|february|march|april|may|june|july|august|september|"
+    r"october|november|december|yesterday|today|tomorrow|last|next|"
+    r"\d{1,4}(?:st|nd|rd|th)?|\d{1,2}:\d{2})\b", re.I)
+_NUMBER_RE = re.compile(r"\b\d+(?:\.\d+)?\b")
+_GENERIC_TURN_RE = re.compile(
+    r"^(?:thanks|thank you|wow|nice|great|awesome|did you|what did it|"
+    r"that(?:'s| is) (?:great|nice|awesome)|sounds good)\b", re.I)
+_QUESTION_ECHO_RE = re.compile(
+    r"^(?:what|when|where|who|why|how|did|does|do|is|are|can|could|"
+    r"would|have|has|should)\b", re.I)
+
+
+def _sentence_answerability(question: str, sentence: str,
+                            all_sentences: Sequence[str],
+                            suppress_question_echo: bool = False) -> float:
+    """Score observable query/type signals for deterministic readout."""
+    q = [t for t in clean_tokens(question) if t not in _READER_STOPWORDS]
+    sent_tokens = set(clean_tokens(sentence))
+    if not q:
+        return 0.0
+    df = Counter(t for text in all_sentences
+                 for t in set(clean_tokens(text)))
+    n = max(len(all_sentences), 1)
+    overlap = set(q) & sent_tokens
+    score = sum(math.log((1.0 + n) / (1.0 + df[t])) + 1.0
+                for t in overlap)
+    ql = question.lower()
+    if ql.startswith(("when ", "what time", "what date")):
+        score += 1.25 if _DATE_OR_TIME_RE.search(sentence) else 0.0
+    if ql.startswith(("how many ", "how much ", "what number")):
+        score += 1.25 if _NUMBER_RE.search(sentence) else 0.0
+    if _GENERIC_TURN_RE.search(sentence.strip()):
+        score -= 0.65
+    if suppress_question_echo and _QUESTION_ECHO_RE.search(sentence.strip()):
+        # A retrieved turn often repeats the user's question.  This is an
+        # observable readout nuisance, not evidence that the turn is false;
+        # keep it available but prefer declarative response sentences.
+        score -= 0.85
+    if len(clean_tokens(sentence)) < 4 and score > 0:
+        score -= 0.15
+    return score
+
+
+def _pack_context(question: str, ids: Sequence[str], by: Dict[str, TraceMsg],
+                  token_budget: int = 0,
+                  reader_mode: str = "overlap") -> Tuple[str, ...]:
+    """Pack query-supported sentences without changing evidence identity."""
+    q = set(clean_tokens(question))
+    ranked = []
+    all_sentences = [s.strip() for mid in ids
+                     for s in SENT_RE.split(by[mid].content) if s.strip()]
+    for pos, mid in enumerate(ids):
+        sentences = [s.strip() for s in SENT_RE.split(by[mid].content)
+                     if s.strip()]
+        if not sentences:
+            continue
+        supported = [s for s in sentences if q & set(clean_tokens(s))]
+        chosen = supported or sentences[:1]
+        for s in chosen:
+            toks = clean_tokens(s)
+            overlap = len(q & set(toks))
+            signal = (_sentence_answerability(
+                question, s, all_sentences,
+                suppress_question_echo=(reader_mode == "answerability_structured"))
+                      if reader_mode in {"answerability", "answerability_structured"}
+                      else float(overlap))
+            ranked.append((signal, overlap, -pos, s, len(toks)))
+    ranked.sort(key=lambda x: (-x[0], -x[1], -x[2], x[3]))
+    if not token_budget:
+        return tuple(x[3] for x in sorted(ranked, key=lambda x: (-x[2], x[3])))
+    selected = []
+    used = 0
+    for _, _, _, sentence, n_tokens in ranked:
+        if used + n_tokens > token_budget:
+            continue
+        selected.append(sentence)
+        used += n_tokens
+    if not selected and ranked:
+        # Never silently turn a non-empty workspace into an empty prompt;
+        # one salient sentence is retained even when it exceeds the cap.
+        selected.append(ranked[0][3])
+    return tuple(selected)
 
 
 SQCAD_ABLATION_CONFIG = {
@@ -517,8 +970,115 @@ SQCAD_ABLATION_CONFIG = {
         candidate_guard=True, candidate_guard_budget=2),
     "sqcad_candidate_guard_4": SqcadConfig(
         candidate_guard=True, candidate_guard_budget=4),
+    "sqcad_candidate_guard_8": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=8),
+    "sqcad_candidate_guard_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16),
+    "sqcad_candidate_guard_full": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=10**9),
+    "sqcad_candidate_guard_adaptive": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        adaptive_candidate_guard=True),
     "sqcad_candidate_guard": SqcadConfig(
         candidate_guard=True, candidate_guard_budget=4),
+    "sqcad_dense_guard_4": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=4,
+        candidate_source="dense"),
+    "sqcad_hybrid_guard_4": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=4,
+        candidate_source="hybrid"),
+    "sqcad_hybrid_guard_4_reserve_1": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=4,
+        candidate_source="hybrid", candidate_reserve=1),
+    "sqcad_denoise_guard_4": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=4,
+        candidate_source="hybrid", denoise=True),
+    "sqcad_denoise_guard_8": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=8,
+        candidate_source="hybrid", denoise=True),
+    "sqcad_denoise_guard_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True),
+    "sqcad_denoise_guard_full": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=10**9,
+        candidate_source="hybrid", denoise=True),
+    "sqcad_denoise_guard_32": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=32,
+        candidate_source="hybrid", denoise=True),
+    "sqcad_denoise_nosmooth_guard_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True, graph_smoothing=False),
+    "sqcad_denoise_nodiverse_guard_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True, diversity_penalty=False),
+    "sqcad_fir_denoise_guard_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True, temporal_fir=True,
+        reader_mode="answerability"),
+    "sqcad_fir_denoise_abstain_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True, temporal_fir=True,
+        reader_mode="answerability_abstain"),
+    "sqcad_fir_denoise_guard_full": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=10**9,
+        candidate_source="hybrid", denoise=True, temporal_fir=True,
+        reader_mode="answerability"),
+    "sqcad_fir_denoise_expand_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", candidate_expansion=True,
+        denoise=True, temporal_fir=True, reader_mode="answerability"),
+    "sqcad_fir_structured_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", response_prior=True,
+        denoise=True, temporal_fir=True,
+        reader_mode="answerability_structured"),
+    "sqcad_fir_structured_overlap_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", response_prior=True,
+        denoise=True, temporal_fir=True,
+        reader_mode="overlap"),
+    "sqcad_fir_structured_compact_1536": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", response_prior=True,
+        denoise=True, temporal_fir=True, context_token_budget=1536,
+        reader_mode="answerability_structured"),
+    "sqcad_fir_structured_compact_1280": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", response_prior=True,
+        denoise=True, temporal_fir=True, context_token_budget=1280,
+        reader_mode="answerability_structured"),
+    "sqcad_fir_denoise_overlap_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True, temporal_fir=True,
+        reader_mode="overlap"),
+    "sqcad_fir_denoise_reader_v2_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True, temporal_fir=True,
+        reader_mode="answerability"),
+    "sqcad_denoise_adaptive": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        adaptive_candidate_guard=True, candidate_source="hybrid",
+        denoise=True),
+    "sqcad_denoise_compact_guard_4": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=4,
+        candidate_source="hybrid", denoise=True,
+        context_token_budget=512),
+    "sqcad_denoise_compact_guard_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True,
+        context_token_budget=512),
+    "sqcad_denoise_compact1k_guard_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True,
+        context_token_budget=1024),
+    "sqcad_denoise_compact280_guard_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True,
+        context_token_budget=280),
+    "sqcad_denoise_compact300_guard_16": SqcadConfig(
+        candidate_guard=True, candidate_guard_budget=16,
+        candidate_source="hybrid", denoise=True,
+        context_token_budget=300),
     "sqcad_no_qualification": SqcadConfig(qualification=False),
     "sqcad_no_version_gate": SqcadConfig(version_gate=False),
     "sqcad_no_silence_semantics": SqcadConfig(silence_semantics=False,
@@ -535,7 +1095,9 @@ SQCAD_ABLATION_CONFIG = {
 
 
 def _sqcad_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
-                  policy: str, feats: TraceFeatures) -> PolicyResult:
+                  policy: str, feats: TraceFeatures,
+                  dense_ws: Optional[Dict[str, Tuple[str, ...]]] = None
+                  ) -> PolicyResult:
     cfg = SQCAD_ABLATION_CONFIG[policy]
     by = feats.by
     toks = feats.toks
@@ -612,6 +1174,7 @@ def _sqcad_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
 
     # ---- QA time (frozen QA order) ----
     workspaces: Dict[str, Tuple[str, ...]] = {}
+    context_texts: Dict[str, Tuple[str, ...]] = {}
     for t in tasks:
         q = set(t.query_tokens)
         overlap = {mid: len(toks[mid] & q) for mid in toks}
@@ -636,13 +1199,140 @@ def _sqcad_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
         # persistent write.  Qualification remains the only write gate.
         candidate_probe_ids: List[str] = []
         if cfg.candidate_guard:
-            all_ranked = sorted(
-                bm25_scores(msgs, t.query_tokens).items(),
-                key=lambda kv: (-kv[1], kv[0]))
-            candidate_probe_ids = [
-                mid for mid, value in all_ranked
-                if value > 0.0 and mid not in pool and mid not in probe_ids
-            ][:cfg.candidate_guard_budget]
+            all_scores = bm25_scores(msgs, t.query_tokens)
+            lexical_ranked = sorted(
+                all_scores.items(), key=lambda kv: (-kv[1], kv[0]))
+            if cfg.candidate_source == "dense":
+                if dense_ws is None:
+                    raise ValueError(
+                        f"{policy} requires a dense workspace cache")
+                all_ranked = [(mid, 1.0) for mid in
+                              dense_ws.get(t.task_id, ())]
+            elif cfg.candidate_source == "hybrid":
+                if dense_ws is None:
+                    raise ValueError(
+                        f"{policy} requires a dense workspace cache")
+                ids = [m.msg_id for m in msgs]
+                b_rank = {mid: i for i, (mid, _) in
+                          enumerate(lexical_ranked)}
+                d_rank = {mid: i for i, mid in enumerate(
+                    dense_ws.get(t.task_id, ()))}
+                # The dense cache stores only its top-B list. Missing dense
+                # ranks are placed after the visible list; this is a fixed,
+                # gold-free RRF candidate ordering.
+                rrf = {
+                    mid: (1.0 / (60 + 1 + b_rank[mid])
+                          + 1.0 / (60 + 1 + d_rank.get(mid, len(ids))))
+                    for mid in ids
+                }
+                all_ranked = sorted(ids,
+                                    key=lambda mid: (-rrf[mid], mid))
+                all_ranked = [(mid, rrf[mid]) for mid in all_ranked]
+            else:
+                all_ranked = lexical_ranked
+            guard_budget = cfg.candidate_guard_budget
+            if cfg.adaptive_candidate_guard:
+                retained_best = max(
+                    (all_scores.get(mid, 0.0) for mid in pool),
+                    default=0.0)
+                archive_best = max(
+                    (all_scores.get(mid, 0.0) for mid in archived),
+                    default=0.0)
+                if retained_best <= 0.0 < archive_best:
+                    guard_budget = 16
+                elif archive_best > retained_best:
+                    guard_budget = 8
+                else:
+                    guard_budget = 2
+            if cfg.candidate_expansion or cfg.response_prior:
+                # Expand observable high-score seeds in the same session.
+                # ``candidate_expansion`` is the symmetric radius-one
+                # diagnostic; ``response_prior`` is more structured: it
+                # prefers the next declarative turn after an interrogative
+                # anchor, which is an observable dialogue edge rather than a
+                # query-local relevance assumption.
+                session_order: Dict[str, List[str]] = defaultdict(list)
+                for msg in sorted(msgs, key=lambda item: (item.session_id,
+                                                            item.date_idx,
+                                                            item.msg_id)):
+                    session_order[msg.session_id].append(msg.msg_id)
+                positions = {
+                    mid: idx for sid, seq in session_order.items()
+                    for idx, mid in enumerate(seq)
+                }
+                seed_ids = [mid for mid, value in all_ranked
+                            if value > 0.0][:max(8, min(guard_budget, 8))]
+                rank_value = {mid: (rank, value)
+                              for rank, (mid, value) in enumerate(all_ranked)}
+                proposal_order: List[str] = []
+                if cfg.response_prior:
+                    response_candidates: List[Tuple[float, int, str]] = []
+                    for seed in seed_ids:
+                        sid = by[seed].session_id
+                        seq = session_order[sid]
+                        idx = positions[seed]
+                        anchor = by[seed].content.strip()
+                        anchor_is_question = bool(
+                            anchor.endswith("?") or
+                            re.match(r"^(?:what|when|where|who|why|how|did|"
+                                     r"does|do|is|are|can|could|would)\\b",
+                                     anchor, re.I))
+                        anchor_overlap = len(
+                            (set(clean_tokens(anchor)) - _READER_STOPWORDS)
+                            & (set(t.query_tokens) - _READER_STOPWORDS))
+                        if not anchor_is_question or anchor_overlap < 2:
+                            continue
+                        # A response is usually the immediate next turn; a
+                        # second step is allowed only as a lower-priority
+                        # continuation for multi-sentence answers.
+                        for step in (1,):
+                            nidx = idx + step
+                            if nidx >= len(seq):
+                                continue
+                            mid = seq[nidx]
+                            if mid == seed:
+                                continue
+                            candidate = by[mid].content.strip()
+                            if _QUESTION_ECHO_RE.search(candidate):
+                                declarative = -0.35
+                            else:
+                                declarative = 0.35
+                            lexical = min(max(all_scores.get(mid, 0.0),
+                                              0.0), 1.0)
+                            # Higher is better; rank breaks ties without using
+                            # evaluator evidence.
+                            priority = (1.0 if step == 1 else 0.55) + declarative \
+                                + 0.10 * lexical
+                            rank = rank_value.get(mid, (len(all_ranked), 0.0))[0]
+                            response_candidates.append((-priority, rank, mid))
+                    response_candidates.sort(key=lambda item: item)
+                    proposal_order.extend(mid for _, _, mid in response_candidates)
+                if cfg.candidate_expansion:
+                    expanded: List[Tuple[float, float, str]] = []
+                    for seed in seed_ids:
+                        sid = by[seed].session_id
+                        seq = session_order[sid]
+                        idx = positions[seed]
+                        for neighbour_idx in (idx - 1, idx + 1):
+                            if not 0 <= neighbour_idx < len(seq):
+                                continue
+                            mid = seq[neighbour_idx]
+                            distance = abs(neighbour_idx - idx)
+                            rank, value = rank_value[mid]
+                            expanded.append((rank + 0.25 * distance,
+                                             -value, mid))
+                    expanded.sort(key=lambda item: (item[0], item[1], item[2]))
+                    proposal_order.extend(mid for _, _, mid in expanded)
+                proposal_order += [mid for mid, value in all_ranked
+                                   if value > 0.0]
+                candidate_probe_ids = list(dict.fromkeys(
+                    mid for mid in proposal_order
+                    if mid not in pool and mid not in probe_ids))[:guard_budget]
+            else:
+                candidate_probe_ids = [
+                    mid for mid, value in all_ranked
+                    if value > 0.0 and mid not in pool and mid not in probe_ids
+                ][:guard_budget]
             for mid in candidate_probe_ids:
                 lifecycle["probes"] += 1
                 rows.append({"mid": mid, "action": "candidate_probe",
@@ -669,9 +1359,33 @@ def _sqcad_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
                                          else 1.0) for mid in pool_exposure}
         else:
             eff = q_scores
-        ranked = sorted(pool_exposure, key=lambda mid: (-eff[mid], mid))
-        exposed = ranked[:BUDGET]
+        if cfg.denoise:
+            # Denoising is an access-time transformation only.  The retained
+            # and archived sets, qualification state, and all lifecycle
+            # counters remain exactly those produced above.
+            ranked = _denoise_rank(pool_exposure, eff, toks, by,
+                                   cfg.context_token_budget,
+                                   cfg.graph_smoothing,
+                                   cfg.diversity_penalty,
+                                   cfg.temporal_fir)
+        else:
+            ranked = sorted(pool_exposure, key=lambda mid: (-eff[mid], mid))
+        if cfg.candidate_reserve and candidate_probe_ids:
+            # Reserve only the highest-ranked observable candidate proposal;
+            # all remaining slots use the normal qualification/risk ranking.
+            # This isolates workspace competition from candidate coverage and
+            # never reads evaluator gold or future needed IDs.
+            reserve = [mid for mid in candidate_probe_ids
+                       if mid in pool_exposure][:cfg.candidate_reserve]
+            exposed = reserve + [mid for mid in ranked if mid not in reserve]
+            exposed = exposed[:BUDGET]
+        else:
+            exposed = ranked[:BUDGET]
         workspaces[t.task_id] = tuple(exposed)
+        if cfg.denoise:
+            context_texts[t.task_id] = _pack_context(
+                t.question, exposed, by, cfg.context_token_budget,
+                cfg.reader_mode)
 
         # restore: a probed item is re-admitted permanently iff it earned an
         # exposure slot under this QA's ranking (cost-aware) -- or always
@@ -693,12 +1407,30 @@ def _sqcad_engine(msgs: Sequence[TraceMsg], tasks: Sequence[TraceTask],
     return PolicyResult(policy=policy, workspaces=workspaces,
                         storage_ids=tuple(retained),
                         storage_tokens=_storage_tokens(msgs, retained),
-                        lifecycle=lifecycle, rows=rows)
+                        lifecycle=lifecycle, rows=rows,
+                        context_texts=context_texts,
+                        reader_mode=cfg.reader_mode,
+                        physical_storage_tokens=sum(len(m.tokens) for m in msgs),
+                        physical_storage_semantics="archive_readable")
 
 
 # ---------------------------------------------------------------------------
 # policy dispatch
 # ---------------------------------------------------------------------------
+
+def policy_requires_dense(policy: str) -> bool:
+    """Whether ``policy`` needs the frozen dense workspace artifact.
+
+    Keeping this predicate shared by dispatch and the batch CLI prevents a
+    successful run from silently dropping hybrid SQCAD rows when a cache is
+    absent or keyed differently.
+    """
+    policy = NAMED_BASELINE_ALIASES.get(policy, policy)
+    if policy in ("dense", "rrf"):
+        return True
+    cfg = SQCAD_ABLATION_CONFIG.get(policy)
+    return bool(cfg and cfg.candidate_source in {"dense", "hybrid"})
+
 
 def run_policy(policy: str, trace: Trace,
                dense_ws: Optional[Dict[str, Tuple[str, ...]]] = None,
@@ -708,10 +1440,9 @@ def run_policy(policy: str, trace: Trace,
     external artifact (dense cache) is missing.  `feats` (per-trace
     observable evidence) is computed lazily; batch runs should precompute
     it once per trace and pass it in."""
+    policy = NAMED_BASELINE_ALIASES.get(policy, policy)
     msgs = trace.msgs
     tasks = needed_free(trace.tasks)
-    if feats is None:
-        feats = trace_features(msgs)
     if policy == "no_memory":
         return PolicyResult(
             policy=policy,
@@ -740,6 +1471,15 @@ def run_policy(policy: str, trace: Trace,
             / (1.0 + (max_idx - m.date_idx) / 50.0) for m in msgs}, policy)
     if policy == "bm25":
         return _retrieval_engine(msgs, tasks, bm25_scores, policy)
+    if policy == "bm25_answerability":
+        return _retrieval_engine(msgs, tasks, bm25_scores, policy,
+                                 reader_mode="answerability")
+    if policy == "bm25_answerability_structured":
+        return _retrieval_engine(msgs, tasks, bm25_scores, policy,
+                                 reader_mode="answerability_structured")
+    if policy == "bm25_answerability_abstain":
+        return _retrieval_engine(msgs, tasks, bm25_scores, policy,
+                                 reader_mode="answerability_abstain")
     if policy == "dense":
         if dense_ws is None:
             return None
@@ -829,6 +1569,8 @@ def run_policy(policy: str, trace: Trace,
         # controlled proxy transport: base score with conflict-gate fallback
         # (group = session mean) substituting for the unavailable
         # semantic-confidence / harm-veto signals
+        if feats is None:
+            feats = trace_features(msgs)
         base = feats.base
         updaters = feats.updaters
         sess_sum: Dict[str, float] = defaultdict(float)
@@ -845,7 +1587,12 @@ def run_policy(policy: str, trace: Trace,
                                else base[m.msg_id])
         return _static_engine(msgs, tasks, score, policy)
     if policy in SQCAD_ABLATION_CONFIG:
-        return _sqcad_engine(msgs, tasks, policy, feats)
+        cfg = SQCAD_ABLATION_CONFIG[policy]
+        if policy_requires_dense(policy) and dense_ws is None:
+            return None
+        if feats is None:
+            feats = trace_features(msgs)
+        return _sqcad_engine(msgs, tasks, policy, feats, dense_ws=dense_ws)
     raise KeyError(policy)
 
 
@@ -878,7 +1625,10 @@ def evaluate_trace(res: PolicyResult, trace: Trace,
         else:
             hit = None
             recall = None
-        tokens = sum(len(by[mid].tokens) for mid in ws if mid in by)
+        packed = res.context_texts.get(t.task_id)
+        tokens = (sum(len(clean_tokens(s)) for s in packed)
+                  if packed is not None else
+                  sum(len(by[mid].tokens) for mid in ws if mid in by))
         rows.append({"task_id": t.task_id, "scope": t.scope,
                      "n_needed_visible": len(needed),
                      "hit": hit, "recall": recall,
@@ -944,6 +1694,9 @@ def evaluate_trace(res: PolicyResult, trace: Trace,
         "ku_hit": ku_hit,
         "distractor_rate": distractor_rate,
         "storage_tokens": res.storage_tokens,
+        "authorized_storage_tokens": res.storage_tokens,
+        "physical_storage_tokens": res.physical_storage_tokens,
+        "physical_storage_semantics": res.physical_storage_semantics,
         "lifecycle": dict(res.lifecycle),
         "n_masked_needed": n_masked_needed,
         "rows": rows,
@@ -955,7 +1708,9 @@ def evaluate_trace(res: PolicyResult, trace: Trace,
 # ---------------------------------------------------------------------------
 
 def _sentence_reader(question: str, workspace: Tuple[str, ...],
-                     by: Dict[str, TraceMsg]) -> str:
+                     by: Dict[str, TraceMsg],
+                     context_texts: Optional[Tuple[str, ...]] = None,
+                     reader_mode: str = "overlap") -> str:
     """Deterministic extractive reader (no generation model): top-3 turns
     by BM25; among their sentences pick the one with the largest token
     overlap with the question; fallback to the top turn's first sentence."""
@@ -967,12 +1722,27 @@ def _sentence_reader(question: str, workspace: Tuple[str, ...],
         return ""
     scores = bm25_scores(pool, clean_tokens(question))
     top = sorted(pool, key=lambda m: (-scores[m.msg_id], m.msg_id))[:3]
-    best, best_overlap = "", -1
-    for m in top:
-        for sent in SENT_RE.split(m.content):
-            ov = len(q & set(clean_tokens(sent)))
-            if ov > best_overlap:
-                best, best_overlap = sent, ov
+    best, best_signal = "", float("-inf")
+    if context_texts is not None:
+        sentence_groups = [context_texts]
+    else:
+        sentence_groups = [tuple(SENT_RE.split(m.content)) for m in top]
+    all_sentences = [s.strip() for group in sentence_groups for s in group
+                     if s.strip()]
+    for sentences in sentence_groups:
+        for sent in sentences:
+            if reader_mode in {"answerability", "answerability_abstain",
+                               "answerability_structured"}:
+                signal = _sentence_answerability(
+                    question, sent, all_sentences,
+                    suppress_question_echo=(reader_mode ==
+                                             "answerability_structured"))
+            else:
+                signal = float(len(q & set(clean_tokens(sent))))
+            if signal > best_signal:
+                best, best_signal = sent, signal
+    if reader_mode == "answerability_abstain" and best_signal <= 0.0:
+        return "No information available"
     if best:
         return best.strip()
     first = SENT_RE.split(top[0].content)
@@ -995,7 +1765,8 @@ def locomo_predictions(res: PolicyResult, trace: Trace,
             "category": meta.get("category"),
             "evidence": meta.get("evidence", []),
             "prediction": _sentence_reader(
-                t.question, res.workspaces[t.task_id], by),
+                t.question, res.workspaces[t.task_id], by,
+                res.context_texts.get(t.task_id), res.reader_mode),
             # official recall needs a non-empty list; a sentinel dia id
             # never matches any evidence id (recall 0 for empty workspaces)
             "prediction_context": list(res.workspaces[t.task_id])
@@ -1067,7 +1838,8 @@ def mirror_locomo_f1(prediction: str, ground_truth: str, category: int
 # ---------------------------------------------------------------------------
 
 METRIC_KEYS = ("hit_rate", "recall_mean", "tokens_mean", "rare_recall",
-               "ku_recall", "distractor_rate", "storage_tokens")
+               "ku_recall", "distractor_rate", "storage_tokens",
+               "authorized_storage_tokens", "physical_storage_tokens")
 
 
 def aggregate(policy: str, evals: List[Dict]) -> Dict[str, Any]:
@@ -1205,11 +1977,14 @@ def main() -> None:
             feats = trace_features(masked.msgs)  # once per trace, shared
             for pol in policies:
                 dense_ws = dense_cache.get(trace.sample_id)
-                if pol in ("dense", "rrf") and dense_ws is None:
+                if policy_requires_dense(pol) and dense_ws is None:
                     continue  # skipped: cache missing
                 res = run_policy(pol, masked, dense_ws=dense_ws, feats=feats)
                 if res is None:
                     continue
+                # Preserve the canonical named-baseline label in artifacts;
+                # the dispatcher executes its explicitly documented proxy.
+                res.policy = pol
                 evals.setdefault(pol, []).append(
                     evaluate_trace(res, masked, visible_ids))
                 if name == "locomo" and args.qa_out_dir:

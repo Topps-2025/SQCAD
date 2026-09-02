@@ -8,6 +8,7 @@ run on small fixed episode subsets with fixed seeds.
 from __future__ import annotations
 
 import json
+import dataclasses
 import sys
 from pathlib import Path
 
@@ -225,6 +226,14 @@ class TestBaselines:
         ep2 = build_episode(20260817, "harmful_stale", "correction_visible",
                             "lucas")
         assert B.p_sqcad_cert(ep2) == "archive"
+
+    def test_simplemem_lexical_surface_uses_current_query_only(self):
+        ep = build_episode(20260817, "stable_positive", "default", "ethan")
+        action = B.p_simplemem_lexical(ep)
+        # The named surface is a current-query lexical control, not a future
+        # oracle.  Replacing the future schedule cannot alter its action.
+        mutated = dataclasses.replace(ep, future_items=())
+        assert action == B.p_simplemem_lexical(mutated)
 
     def test_matrix_runs_and_has_oracle_bound(self):
         eps = _sample(12)

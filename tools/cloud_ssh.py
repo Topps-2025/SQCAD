@@ -48,9 +48,11 @@ def main() -> None:
                                                     get_pty=True)
         out = stdout.read().decode("utf-8", "replace")
         err = stderr.read().decode("utf-8", "replace")
-        sys.stdout.write(out)
+        # Windows consoles may default to GBK; emit UTF-8 bytes explicitly so
+        # remote progress bars and Chinese diagnostics cannot crash the helper.
+        sys.stdout.buffer.write(out.encode("utf-8", "replace"))
         if err.strip():
-            sys.stdout.write("\n[stderr]\n" + err)
+            sys.stdout.buffer.write(("\n[stderr]\n" + err).encode("utf-8", "replace"))
         rc = stdout.channel.recv_exit_status()
         sys.exit(rc if rc is not None else 1)
     finally:

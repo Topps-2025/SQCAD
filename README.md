@@ -4,10 +4,16 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-360%20passing-success)](tests/)
+[![Tests](https://img.shields.io/badge/tests-457%20passing-success)](tests/)
+[![Paper](https://img.shields.io/badge/paper-PDF-B31B1B?style=flat)](paper/SQCAD_ICLR2027.pdf)
+[![Benchmark](https://img.shields.io/badge/LifecycleBench--v3-225%20worlds-4C1?style=flat)](benchmarks/lifecyclebench_v3/)
 
 > **Propose broadly. Qualify cautiously. Focus competitively.**
 > Access decays. Source evidence survives. Belief is scoped.
+
+📄 **Paper:** [`paper/SQCAD_ICLR2027.pdf`](paper/SQCAD_ICLR2027.pdf) — *When to Keep and When to Archive: Lifecycle-Aware Authorization for Persistent Agent Memory* (ICLR 2027 submission draft, LaTeX source in [`paper/tex/`](paper/tex/)).
+
+📊 **Benchmark:** [`benchmarks/lifecyclebench_v3/`](benchmarks/lifecyclebench_v3/) — LifecycleBench-v3, 225 counterfactual worlds for keep/archive authorization, with a standalone scorer and runnable baselines. No GPU, no API key, no dependencies beyond the standard library.
 
 ![SQCAD core mechanism](docs/assets/sqcad-framework-20260813.png)
 
@@ -42,9 +48,9 @@ This repository is a **research artifact with rigorous controlled evidence**, no
 
 - ✅ **Verified (strict proofs + controlled numerics):** memory-specific identification gaps — observational equivalence with opposite optimal actions, query-local causal effects insufficient for lifecycle decisions, source averages not automatically transportable (Theorems 1–2, Corollary 1); a self-obscuring lifecycle theorem showing $\Theta(T)$ regret without a recovery channel (T1, `docs/自用/01-research-gap/研究逻辑与理论证明/15-…`); restricted reduction separation for fully censored/no-restore committed policies (T2, `16-…`); fixed-sample probing lower bounds (P4); and qualification-gated recovery of known lifecycle values under identification conditions C1–C8, with all five tested violations caught as `unresolved`/`mismatch`. The current recovery claim is the finite-horizon `Safe(H,\delta)` upper/lower pair in the linked theory note below, not a universal constant-regret guarantee.
 - ✅ **Verified (controlled unified-contract benchmarks):** 18-policy main table and cost contract (`results/`, gitignored, hash-frozen) — see `docs/docs_en/02_experiments.md`.
-- ✅ **Verified (public data, unified contract, AutoDL GPU re-checked):** on LongMemEval-S / LoCoMo, the original SQCAD's shortcoming was evidence never entering the one-shot exposure pool; minimal fix **Guard-1** (≤1 BM25 candidate into the read pool; persistent-write authorization unchanged) raises LoCoMo official token-F1 0.0344 → 0.0455 — see `docs/docs_en/02_experiments.md`, report 19.
-- ✅ **Verified (self-built benchmark + fairness audit):** SQCAD-LifecycleBench — 1,380 keep/archive counterfactual episodes, public/hidden truth separation, remote rebuild hash-identical; R1–R5/R7 defenses passed, all 13 preregistered verdicts hit; three framework changes quantified (lineage conflict → archive +8.62 significant) — see report 20.
-- ⏳ **Not yet done:** official R3 reproductions of model-dependent baselines (per-baseline status in `docs/自用/03-实验证据链/15-基线开源状态与无GPU复现审计-20260813.md`); dense/RRF (official weights unavailable); R6 human anchoring; Phase B end-to-end.
+- ✅ **Verified (public data, unified contract, AutoDL GPU re-checked):** on LongMemEval-S / LoCoMo, the original SQCAD's shortcoming was evidence never entering the one-shot exposure pool; historical Guard-1 improved the extractive-contract LoCoMo token-F1 row, while the current shared Qwen3-8B reader challenge still places BM25 above SQCAD. These are trade-off and failure-analysis results, not SOTA claims.
+- ✅ **Verified (self-built benchmark + fairness audit):** SQCAD-LifecycleBench — 1,380 keep/archive counterfactual episodes, public/hidden truth separation, remote rebuild hash-identical; R1–R5/R7 defenses passed under the frozen contract. Episode-level verdicts are retained as descriptive artifacts; bucket-level inference uses the honest 14 mechanism buckets and does not upgrade every historical episode-level significance claim — see reports 20, 53, and 58.
+- ⏳ **Not yet done:** remote provenance completion for the SimpleMem/G4b rows; full-pool G2 sensitivity; external theory review; official ICLR 2027 TeX migration; credential rotation and Git-history purge. R6 external anchoring was attempted and failed (see report 54); ActMem remains partial and dense/RRF remains blocked because official weights are unavailable. The repaired cap=14/cap=30 G2 reruns and corrected G6 v3 CPU rerun are complete and recorded as bounded evidence (reports 64--66).
 - ❌ **Not claimed:** SOTA on any public benchmark; causal discovery from observational success; universal scope transport; physical deletion guarantees.
 
 **Theory scope correction (2026-08-21).** The former one-sided `O(1/(q rho))` restore plateau is diagnostic only. The current theory claim is the finite-horizon `Safe(H, delta)` pair plus an anytime/stitched Qualification certificate: two-sided certificates have matching lifecycle + probe + restore total-cost order against a transcript-KL lower bound, with false restore explicitly charged; the stitched version has only `log log n` confidence overhead. See [safe-recovery theorem](docs/自用/01-research-gap/研究逻辑与理论证明/17-安全恢复证书定理与匹配下界-20260821.md).
@@ -57,7 +63,7 @@ cd SQCAD
 python -m venv .venv
 # Windows: .\.venv\Scripts\Activate.ps1   |  POSIX: source .venv/bin/activate
 pip install -e ".[dev]"
-PYTHONPATH=src python -m pytest tests/ -q          # 360 tests, CPU-only, no API keys
+PYTHONPATH=src python -m pytest tests/ -q          # 457 tests, CPU-only, no API keys
 ```
 
 Run a controlled smoke experiment (CPU-only, deterministic):
@@ -67,6 +73,14 @@ PYTHONPATH=src python -m sqcad.governance_baseline_simulator --seeds 5 --samples
 PYTHONPATH=src python -m sqcad.unified_baseline_runner    # 18-policy unified-contract main table
 PYTHONPATH=src python -m sqcad.freeze_four_piece          # regenerate the four-piece SHA-256 freeze manifest
 PYTHONPATH=src python tools/render_framework_diagram.py   # re-render the architecture diagram
+```
+
+Score a controller on the released benchmark (standard library only):
+
+```bash
+cd benchmarks/lifecyclebench_v3
+python example_controller.py --rule qualify_lineage --out actions.json
+python score.py --actions actions.json --by-family
 ```
 
 Every module is CPU-only; no GPU, model weights or API keys are required for the repository's own experiments. (Model-dependent *baseline* reproductions are a different story — see the baseline audit.)
@@ -79,6 +93,15 @@ SQCAD/
 ├── LICENSE
 ├── pyproject.toml
 ├── DATA_STORAGE.md                  # external D-drive database policy
+├── AGENTS.md / CLAUDE.md            # coding-agent adapters (Codex, Claude Code)
+├── paper/
+│   ├── SQCAD_ICLR2027.pdf           # released paper
+│   └── tex/                         # LaTeX source, figures, bibliography
+├── benchmarks/lifecyclebench_v3/    # released dataset + standalone scorer
+│   ├── public.jsonl                 # decision-time input (controllers read only this)
+│   ├── hidden.jsonl                 # evaluator-side truth; never read in a controller
+│   ├── score.py                     # metrics + family-cluster bootstrap CIs
+│   └── example_controller.py        # runnable relevance / qualification baselines
 ├── src/sqcad/                       # core store, runners, theory and benchmarks
 │   ├── causal_memory_store.py       # Evidence store: lineage, scope/version, archive/restore
 │   ├── decision_identification_theory.py  # R*(L,U), commit/defer/probe comparison
@@ -88,7 +111,7 @@ SQCAD/
 │   ├── cost_contract_experiment.py  # lifecycle net-benefit contract
 │   ├── freeze_four_piece.py         # code–config–results–reports SHA-256 freeze
 │   └── ...
-├── tests/                           # 360 deterministic unit/protocol checks
+├── tests/                           # 457 deterministic unit/protocol checks
 ├── tools/                           # Gate A annotation, diagram rendering
 ├── docs/
 │   ├── assets/                      # architecture diagram (SVG + PNG)
@@ -109,9 +132,19 @@ Three tiers (`docs/自用/03-实验证据链/15-基线开源状态与无GPU复�
 |---|---|---|
 | **R1 reproducible controls** | no-memory, keep-all, FIFO/LRU, recency, fixed/frequency decay, BM25, dense, BM25+dense RRF | ✅ in-repo, CPU-only |
 | **R2 structural controls** | association-only, query-local/CMI proxy, item-level causal, bundle-level, no-restore/probe, SQCAD ablations | ✅ in-repo, CPU-only |
-| **R3 official systems** | SimpleMem, Oblivion, Memory Worth, FadeMem, DeMem, SAGE, MemAudit, GateMem | ⏳ official reproductions blocked without GPU/API keys; frozen commits and per-baseline paths in `docs/自用/03-实验证据链/15-基线开源状态与无GPU复现审计-20260813.md` |
+| **R3 named Agent Memory systems** | SimpleMem, ActMem, Oblivion, Memory Worth, Trivium, GovMem | ⏳ protocol-separated reproductions are tracked in `results/0824_reproduction_registry.json`; DeMem is excluded from this pool because the supplied PDF is a privacy/adversarial-training paper rather than an Agent Memory system |
 
-Benchmarks: LongMemEval-S · LoCoMo (unified contract executed, AutoDL GPU re-checked, Guard-1 fix verified) · SQCAD-LifecycleBench (self-built, 1,380 episodes, fairness-audited) · GoodAI-LTM / MemoryAgentBench (accessibility audited).
+Benchmarks: LongMemEval-S · LoCoMo (unified contract executed, AutoDL GPU re-checked, Guard-1 fix verified) · [LifecycleBench-v3](benchmarks/lifecyclebench_v3/) (self-built, **open-sourced here**, 225 independently seeded worlds) · GoodAI-LTM / MemoryAgentBench (accessibility audited).
+
+### LifecycleBench-v3 (released)
+
+The keep/archive authorization benchmark used in the paper ships in this
+repository. 225 counterfactual worlds across 9 mechanism families, with
+public/hidden separation, paired rollout values, a standalone scorer, and
+family-cluster bootstrap intervals. `keep_all` scores *worse* than
+`archive_all`, and relevance ranking does not fix it — that gap is the
+score-fiber failure the paper formalizes. See the
+[dataset card](benchmarks/lifecyclebench_v3/README.md).
 
 ## Documentation
 
@@ -121,7 +154,9 @@ Benchmarks: LongMemEval-S · LoCoMo (unified contract executed, AutoDL GPU re-ch
 
 ## Citation
 
-A manuscript is in preparation. For now, cite this repository:
+The paper is under double-blind review; it is included here as
+[`paper/SQCAD_ICLR2027.pdf`](paper/SQCAD_ICLR2027.pdf). Until it appears in
+proceedings, cite this repository:
 
 ```bibtex
 @misc{sqcad2026,

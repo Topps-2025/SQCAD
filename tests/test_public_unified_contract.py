@@ -13,7 +13,8 @@ import pytest
 from src.sqcad.public_unified_contract import (
     ALL_POLICIES, BUDGET, PolicyResult, SQCAD_ABLATIONS,
     aggregate, evaluate_trace, locomo_predictions, mask_lme_chronological,
-    mirror_f1_score, mirror_locomo_f1, needed_free, run_policy, significance,
+    mirror_f1_score, mirror_locomo_f1, needed_free, policy_requires_dense,
+    run_policy, significance,
 )
 from src.sqcad.trace_grounded_runner import (
     Trace, TraceMsg, TraceTask, clean_tokens, load_locomo,
@@ -144,6 +145,40 @@ def test_dense_skips_without_cache_and_honors_cache():
     assert rrf is not None and len(rrf.workspaces["q0"]) <= BUDGET
 
 
+def test_dense_and_hybrid_candidate_guards_require_and_use_cache():
+    masked, _ = mask_lme_chronological(_tiny_lme())
+    for policy in ("sqcad_dense_guard_4", "sqcad_hybrid_guard_4"):
+        assert run_policy(policy, masked) is None
+    fake = {"q0": ("m2", "m0")}
+    for policy in ("sqcad_dense_guard_4", "sqcad_hybrid_guard_4"):
+        res = run_policy(policy, masked, dense_ws=fake)
+        assert res is not None
+        assert len(res.workspaces["q0"]) <= BUDGET
+        proposed = {row["mid"] for row in res.rows
+                    if row.get("action") == "candidate_probe"}
+        assert proposed <= set(fake["q0"]) | {m.msg_id for m in masked.msgs}
+
+
+def test_hybrid_reserve_keeps_top_candidate_in_workspace():
+    msgs = [
+        _msg("m0", "s0", "", 0, "alpha evidence from the early session"),
+        *[_msg(f"m{i}", f"s{i}", "", i,
+               f"unrelated stream item {i} with filler context")
+          for i in range(1, 30)],
+    ]
+    trace = Trace(
+        "reserve", tuple(msgs),
+        (TraceTask("q0", "where is alpha evidence",
+                   clean_tokens("where is alpha evidence"), ("m0",), "", ""),),
+    )
+    dense = {"q0": ("m0", "m1", "m2", "m3")}
+    res = run_policy("sqcad_hybrid_guard_4_reserve_1", trace,
+                     dense_ws=dense)
+    assert res is not None
+    assert "m0" in res.workspaces["q0"]
+    assert len(res.workspaces["q0"]) <= BUDGET
+
+
 # ---------------------------------------------------------------------------
 # SQCAD lifecycle + ablations
 # ---------------------------------------------------------------------------
@@ -159,6 +194,18 @@ def test_sqcad_write_time_evicts_to_budget():
     res = _sqcad_run("sqcad", masked)
     assert len(res.storage_ids) <= BUDGET
     assert res.lifecycle["archives"] >= 0
+
+
+def test_sqcad_reports_authorized_and_physical_storage_separately():
+    masked, _ = mask_lme_chronological(_tiny_lme())
+    res = _sqcad_run("sqcad", masked)
+    assert res.physical_storage_semantics == "archive_readable"
+    assert res.physical_storage_tokens == sum(len(m.tokens)
+                                              for m in masked.msgs)
+    assert res.physical_storage_tokens >= res.storage_tokens
+    ev = evaluate_trace(res, masked, {m.msg_id for m in masked.msgs})
+    assert ev["authorized_storage_tokens"] == res.storage_tokens
+    assert ev["physical_storage_tokens"] == res.physical_storage_tokens
 
 
 def test_sqcad_probe_restore_and_ablation_contrasts():
@@ -208,6 +255,48 @@ def test_candidate_guard_proposes_without_persistent_authorization():
     assert any(row["action"] == "candidate_probe"
                and row["qualification"] == "proposed"
                for row in guarded.rows)
+
+
+def test_structured_response_prior_recovers_next_turn_without_writeback():
+    # The answer turn has no query-overlap; only the observable interrogative
+    # anchor makes it eligible for the response-edge proposal.
+    msgs = [
+        _msg("anchor", "s0", "", 0, "what is the secret code?"),
+        _msg("answer", "s0", "", 1, "zebra"),
+        *[_msg(f"m{i}", f"s{i + 1}", "", i + 2,
+                f"unrelated stream item {i} with filler context")
+          for i in range(30)],
+    ]
+    trace = Trace(
+        "response-prior", tuple(msgs),
+        (TraceTask("q0", "what is the secret code",
+                   clean_tokens("what is the secret code"),
+                   ("answer",), "2", ""),),
+    )
+    res = run_policy("sqcad_fir_structured_16", trace,
+                     dense_ws={"q0": ("anchor",)})
+    assert res is not None
+    assert "answer" in res.workspaces["q0"]
+    assert "answer" not in res.storage_ids
+    assert any(row["action"] == "candidate_probe"
+               and row["mid"] == "answer" for row in res.rows)
+
+
+def test_denoise_rank_suppresses_duplicate_turns():
+    from src.sqcad.public_unified_contract import _denoise_rank
+
+    msgs = [
+        _msg("a", "s0", "", 0, "project atlas budget review complete"),
+        _msg("b", "s1", "", 1, "project atlas budget review complete"),
+        _msg("c", "s2", "", 2, "project atlas launch moved to friday"),
+    ]
+    by = {m.msg_id: m for m in msgs}
+    toks = {m.msg_id: set(m.tokens) for m in msgs}
+    ranked = _denoise_rank(
+        ["a", "b", "c"], {"a": 1.0, "b": 0.99, "c": 0.9},
+        toks, by)
+    assert ranked[0] == "a"
+    assert "c" in ranked[:2]
 
 
 def test_sqcad_fallback_ablation():
@@ -313,6 +402,27 @@ def test_sentence_reader_and_predictions():
     assert "support group" in preds[0]["prediction"].lower()
 
 
+def test_answerability_readout_is_shared_and_observable():
+    trace = _tiny_locomo()
+    base = run_policy("bm25_answerability", trace)
+    sqcad = run_policy("sqcad_fir_denoise_guard_16", trace,
+                       dense_ws={})
+    assert base.reader_mode == "answerability"
+    assert sqcad.reader_mode == "answerability"
+    assert sqcad.context_texts.keys() == sqcad.workspaces.keys()
+
+
+def test_structured_readout_penalizes_question_echo_only():
+    from src.sqcad.public_unified_contract import _sentence_answerability
+
+    question = "what challenge did john encounter"
+    echo = "What challenges have you encountered during training?"
+    answer = "Fitting into the new team's style was a challenge."
+    assert _sentence_answerability(
+        question, answer, [echo, answer], True) > _sentence_answerability(
+            question, echo, [echo, answer], True)
+
+
 def test_write_locomo_qa_files_accumulates_all_traces(tmp_path):
     from src.sqcad.public_unified_contract import write_locomo_qa_files
     t1, t2 = _tiny_locomo(), _tiny_locomo()
@@ -398,3 +508,11 @@ def test_smoke_sqcad_runs_all_traces(locomo):
         assert len(res.storage_ids) <= BUDGET
         for ws in res.workspaces.values():
             assert len(ws) <= BUDGET
+
+
+def test_dense_requirement_covers_hybrid_sqcad_rows():
+    assert policy_requires_dense("dense")
+    assert policy_requires_dense("rrf")
+    assert policy_requires_dense("sqcad_fir_denoise_guard_16")
+    assert policy_requires_dense("sqcad_fir_structured_16")
+    assert not policy_requires_dense("bm25_answerability_structured")

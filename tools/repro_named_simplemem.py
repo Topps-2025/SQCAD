@@ -45,8 +45,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import MethodType
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -80,7 +82,8 @@ class CountingLLMClient:
     temperature 0 (greedy decoding, reproducibility)."""
 
     def __init__(self, client, model: str = "",
-                 cache: "StageCache | None" = None) -> None:
+                 cache: "StageCache | None" = None,
+                 stats: Optional[dict] = None) -> None:
         self._c = client
         # Capture the ORIGINAL bound methods BEFORE the make_system patch
         # replaces them on the instance -- calling self._c.chat_completion
@@ -93,6 +96,7 @@ class CountingLLMClient:
         self.cache_hits = 0
         self._model = model
         self._cache = cache
+        self._stats = stats if stats is not None else {}
         self._lock = threading.Lock()
 
     def chat_completion(self, messages, temperature=0.2,
@@ -127,7 +131,45 @@ class CountingLLMClient:
         return out
 
     def extract_json(self, text: str):
-        return self._orig_json(text)
+        try:
+            parsed = self._orig_json(text)
+        except Exception:
+            # Qwen may stop at max_tokens after emitting several complete
+            # memory objects, leaving the outer array unterminated.  Recover
+            # only complete JSON values from that prefix; this is explicitly
+            # an open-weight substitute parser fallback, not a change to the
+            # official SimpleMem builder or retriever.
+            stripped = text.strip()
+            if not stripped.startswith("["):
+                raise
+            decoder = json.JSONDecoder()
+            idx = 1
+            recovered = []
+            while idx < len(stripped):
+                while idx < len(stripped) and stripped[idx] in " ,\r\n":
+                    idx += 1
+                if idx >= len(stripped) or stripped[idx] == "]":
+                    break
+                try:
+                    item, end = decoder.raw_decode(stripped, idx)
+                except json.JSONDecodeError:
+                    break
+                recovered.append(item)
+                idx = end
+            if not recovered:
+                raise
+            self._stats["json_prefix_recoveries"] = (
+                self._stats.get("json_prefix_recoveries", 0) + 1)
+            parsed = recovered
+        # Qwen's open-weight substitute occasionally emits one valid memory
+        # object instead of a one-element JSON array.  Normalize only objects
+        # carrying the official memory schema; planning/reflection objects
+        # must remain objects and are returned unchanged.
+        if isinstance(parsed, dict) and (
+                "lossless_restatement" in parsed or
+                "keywords" in parsed):
+            return [parsed]
+        return parsed
 
 
 def patch_source_map(mb, source_map: Dict[str, List[int]],
@@ -165,7 +207,8 @@ def patch_source_map(mb, source_map: Dict[str, List[int]],
     mb._generate_memory_entries_worker = MethodType(_worker, mb)
 
 
-def run_simplemem_trace(system, source_map, msgs, tasks, d2m, dialogue_cls):
+def run_simplemem_trace(system, source_map, msgs, tasks, d2m, dialogue_cls,
+                        native_answers: Optional[Dict[str, str]] = None):
     """Feed a trace into SimpleMem, retrieve per task, map entries back to
     source messages, and return a PolicyResult."""
     dialogues = []
@@ -182,8 +225,25 @@ def run_simplemem_trace(system, source_map, msgs, tasks, d2m, dialogue_cls):
     system.finalize()
 
     ws: Dict[str, Tuple[str, ...]] = {}
+    retrieved: Dict[str, list] = {}
     for t in tasks:
         entries = system.hybrid_retriever.retrieve(t.question)
+        retrieved[t.task_id] = entries
+
+    def generate_native(t):
+        return t.task_id, system.answer_generator.generate_answer(
+            t.question, retrieved[t.task_id])
+
+    if native_answers is not None and retrieved:
+        # Answer synthesis is independent across QA tasks.  The upstream
+        # prompt, generator, temperature and parser are unchanged; only the
+        # request scheduling is parallelized for the GPU-backed endpoint.
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for task_id, answer in pool.map(generate_native, tasks):
+                native_answers[task_id] = answer
+
+    for t in tasks:
+        entries = retrieved[t.task_id]
         mids: List[str] = []
         for e in entries:
             for d_id in source_map.get(e.entry_id, []):
@@ -207,7 +267,7 @@ def run_simplemem_trace(system, source_map, msgs, tasks, d2m, dialogue_cls):
 
 
 def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
-                max_traces: int | None) -> dict:
+                max_traces: int | None, native_qa: bool = False) -> dict:
     traces = (load_longmemeval_s(data_path)
               if name == "longmemeval_s" else load_locomo(data_path))
     if max_traces is not None:
@@ -216,8 +276,10 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
 
     per: Dict[str, List[dict]] = {r: [] for r in ROWS}
     qa_pairs: List[Tuple[object, PolicyResult]] = []
-    llm_usage = {"calls": 0, "in_chars": 0, "out_chars": 0, "cache_hits": 0}
-    _calls = _in_chars = _out_chars = _cache_hits = 0
+    native_blocks: List[dict] = []
+    llm_usage = {"calls": 0, "in_chars": 0, "out_chars": 0,
+                 "cache_hits": 0, "json_prefix_recoveries": 0}
+    _calls = _in_chars = _out_chars = _cache_hits = _recoveries = 0
 
     for trace in traces:
         masked, _ = (mask_lme_chronological(trace)
@@ -231,11 +293,28 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
         source_map: Dict[str, List[int]] = {}
         system = cfg["make_system"](source_map)
         d2m: Dict[int, str] = {}
+        native_answers: Optional[Dict[str, str]] = {} if native_qa else None
         res = run_simplemem_trace(system, source_map, msgs, tasks, d2m,
-                                  cfg["dialogue_cls"])
+                                  cfg["dialogue_cls"], native_answers)
         per["simplemem"].append(evaluate_trace(res, masked, visible_ids))
         if name == "locomo" and qa_out is not None:
             qa_pairs.append((trace, res))
+        if name == "locomo" and native_answers is not None:
+            native_rows = []
+            for t in trace.tasks:
+                meta = qa_meta.get(t.task_id, {})
+                native_rows.append({
+                    "sample_id": trace.sample_id,
+                    "question": t.question,
+                    "answer": meta.get("answer"),
+                    "category": meta.get("category"),
+                    "evidence": meta.get("evidence", []),
+                    "prediction": native_answers.get(t.task_id, ""),
+                    "prediction_context": list(res.workspaces[t.task_id])
+                    or ["D__none__"],
+                })
+            native_blocks.append({"sample_id": trace.sample_id,
+                                  "rows": native_rows})
 
         for row in ("sqcad", "bm25"):
             feats = trace_features(masked.msgs)
@@ -248,9 +327,12 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
         _in_chars += system.llm_client.in_chars
         _out_chars += system.llm_client.out_chars
         _cache_hits += getattr(system.llm_client, "cache_hits", 0)
+        _recoveries += getattr(system.llm_client, "_stats", {}).get(
+            "json_prefix_recoveries", 0)
 
     llm_usage = {"calls": _calls, "in_chars": _in_chars,
                  "out_chars": _out_chars, "cache_hits": _cache_hits,
+                 "json_prefix_recoveries": _recoveries,
                  "cache_hits_note": (
                      "generations served from the stage cache on a resumed "
                      "run; excluded from calls/chars, so `calls` is fresh "
@@ -259,6 +341,11 @@ def run_dataset(name: str, data_path: Path, cfg: dict, qa_out: Path | None,
 
     if qa_out is not None and qa_pairs:
         write_locomo_qa_files(qa_pairs, qa_meta, qa_out)
+    if native_blocks and qa_out is not None:
+        qa_out.mkdir(parents=True, exist_ok=True)
+        (qa_out / "predictions_simplemem_native.json").write_text(
+            json.dumps(native_blocks, ensure_ascii=False, indent=2),
+            encoding="utf-8")
 
     out: dict = {"n_traces": len(per["sqcad"]), "rows": {}, "llm_usage": llm_usage}
     for row, evals in per.items():
@@ -298,6 +385,8 @@ def main() -> None:
     ap.add_argument("--simplemem-dir", type=Path, required=True)
     ap.add_argument("--llm-base-url", default="http://localhost:8000/v1")
     ap.add_argument("--llm-model", default="qwen3-8b")
+    ap.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY", "EMPTY"),
+                    help="API key for an OpenAI-compatible endpoint; defaults to OPENAI_API_KEY")
     ap.add_argument("--embedding-model", default="Qwen/Qwen3-Embedding-0.6B")
     ap.add_argument("--qa-out-dir", type=Path, default=None)
     ap.add_argument("--out", type=Path, required=True)
@@ -312,6 +401,9 @@ def main() -> None:
                          "does not discard generation already paid for "
                          "(G-13). Cached replies are reported as "
                          "llm_usage.cache_hits, never as fresh calls.")
+    ap.add_argument("--native-qa", action="store_true",
+                    help="also run the upstream SimpleMem answer generator "
+                         "for LoCoMo and write a separate native scorer file")
     args = ap.parse_args()
     stage_cache = StageCache(args.stage_cache)
 
@@ -321,7 +413,7 @@ def main() -> None:
     snapshot = str(args.simplemem_dir.resolve())
     sys.path.insert(0, snapshot)
     import config as sm_config  # noqa: F401  (official modules read it)
-    sm_config.OPENAI_API_KEY = "EMPTY"
+    sm_config.OPENAI_API_KEY = args.api_key
     sm_config.OPENAI_BASE_URL = args.llm_base_url
     sm_config.LLM_MODEL = args.llm_model
     sm_config.EMBEDDING_MODEL = args.embedding_model
@@ -360,6 +452,16 @@ def main() -> None:
     _db_dir.mkdir(parents=True, exist_ok=True)
     _db_counter = [0]
 
+    _request_tokenizer = None
+    try:
+        from transformers import AutoTokenizer as _AutoTokenizer
+        _request_tokenizer = _AutoTokenizer.from_pretrained(
+            "/root/autodl-tmp/models/Qwen3-8B", local_files_only=True)
+    except Exception:
+        # Local smoke tests may not have the cloud model path.  The fixed
+        # fallback below remains bounded and keeps the runner usable there.
+        _request_tokenizer = None
+
     def patch_no_think(llm_client):
         """Disable Qwen3 thinking at the REQUEST layer.  The official code
         only injects enable_thinking for dashscope base URLs; on a local
@@ -369,7 +471,8 @@ def main() -> None:
         vLLM serving layer understands (chat_template_kwargs) -- official
         code untouched (35- §2.1, open-weight substitute layer config).
 
-        Also caps max_tokens at 2048: the official code never sets it, so
+        Also caps max_tokens at 1536 or the exact remaining context budget:
+        the official code never sets it, so
         under vLLM the default is max_model_len (32768) and a degenerate
         repetition loop (observed on one full-run window) generates tens of
         thousands of tokens before the JSON parser can fail -- a single
@@ -384,7 +487,20 @@ def main() -> None:
             # ride inside extra_body (vLLM reads it from the HTTP body)
             eb = kwargs.setdefault("extra_body", {})
             eb["chat_template_kwargs"] = {"enable_thinking": False}
-            kwargs.setdefault("max_tokens", 2048)
+            # Use the local Qwen tokenizer when available so a long prompt
+            # receives exactly the remaining context, rather than relying on
+            # a fixed cap that can cross the 8192 boundary or truncate a
+            # valid memory array.
+            if _request_tokenizer is not None:
+                try:
+                    n_in = len(_request_tokenizer.apply_chat_template(
+                        kwargs["messages"], tokenize=True,
+                        add_generation_prompt=True))
+                    kwargs["max_tokens"] = min(1536, max(128, 8191 - n_in))
+                except Exception:
+                    kwargs.setdefault("max_tokens", 1400)
+            else:
+                kwargs.setdefault("max_tokens", 1400)
             return _orig(**kwargs)
 
         llm_client.client.chat.completions.create = _create
@@ -421,7 +537,7 @@ def main() -> None:
         _db_counter[0] += 1
         db_path = str(_db_dir / f"mem_{_db_counter[0]:04d}.lance")
         system = SimpleMemSystem(
-            api_key="EMPTY", model=args.llm_model, base_url=args.llm_base_url,
+            api_key=args.api_key, model=args.llm_model, base_url=args.llm_base_url,
             db_path=db_path, table_name="memory_entries", clear_db=True,
             enable_planning=True, enable_reflection=True,
             max_reflection_rounds=2, enable_parallel_processing=True,
@@ -433,7 +549,7 @@ def main() -> None:
         # original bound methods so the instance patch below does not
         # recurse.
         wrapped = CountingLLMClient(system.llm_client, model=args.llm_model,
-                                    cache=stage_cache)
+                                    cache=stage_cache, stats=usage)
         # Disable Qwen3 thinking at the request layer (see patch_no_think)
         patch_no_think(system.llm_client)
         # route every official LLM call through the counter (single
@@ -452,7 +568,8 @@ def main() -> None:
                          _failed_windows)
         return system
 
-    usage = {"calls": 0, "in_chars": 0, "out_chars": 0}
+    usage = {"calls": 0, "in_chars": 0, "out_chars": 0,
+             "json_prefix_recoveries": 0}
 
     payload: dict = {
         "config": {
@@ -473,15 +590,18 @@ def main() -> None:
             "n_boot": N_BOOT, "alpha": 0.05, "method": "studentized",
             "seeds": list(SEEDS),
             "workspace_budget": BUDGET,
-            "max_tokens_cap": 2048,
+            "max_tokens_cap": 1536,
+            "max_tokens_dynamic_context": True,
+            "native_qa": bool(args.native_qa),
             "note": ("LLM row: single greedy run (temperature 0); "
                      "25- zero-diff discipline applies to frozen rows only; "
                      "degenerate-generation windows (all 3 official retries "
-                     "failed) are counted per dataset as failed_windows"),
+                     "failed) are counted per dataset as failed_windows; "
+                     "truncated arrays may use counted complete-object prefix "
+                     "recovery in the substitute parser"),
         },
         "datasets": {},
     }
-    payload["failed_windows_total"] = _failed_windows[0]
     cfg = {"make_system": make_system, "usage": usage,
            "dialogue_cls": Dialogue}
     for name, path in (("longmemeval_s", args.longmemeval),
@@ -490,7 +610,8 @@ def main() -> None:
             continue
         qa_out = (args.qa_out_dir / name) if args.qa_out_dir else None
         payload["datasets"][name] = run_dataset(name, path, cfg, qa_out,
-                                                args.max_traces)
+                                                args.max_traces,
+                                                native_qa=args.native_qa)
         print(f"== {name} ==")
         for row, r in payload["datasets"][name]["rows"].items():
             print(f"  {row:10s} {r['aggregate']}")
@@ -505,6 +626,11 @@ def main() -> None:
                 print(f"  {row:10s} - sqcad {metric:11s}: "
                       f"{e['mean_diff']:+.4f} [{c['ci_low']:+.4f}, "
                       f"{c['ci_high']:+.4f}]{flag}")
+
+    # Set this after all datasets have run.  The official memory builder can
+    # fail a window during the loop; recording the counter before the loop
+    # silently reports zero even when the log contains failed windows.
+    payload["failed_windows_total"] = _failed_windows[0]
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, indent=2, ensure_ascii=False),

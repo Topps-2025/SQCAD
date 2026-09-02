@@ -112,12 +112,29 @@ def _admit(store: Dict[str, float], order: Dict[str, int],
         else:
             ever_evicted.add(mid)
         return
-    worst = min(store, key=lambda k: (salience.get(k, 0.0), -order[k]))
-    if salience.get(worst, 0.0) > salience[mid]:
+    # Variable-length messages may require several evictions.  The previous
+    # one-item replacement could leave ``used + size(mid) > budget`` while
+    # still admitting the new item, invalidating the storage-matched contract.
+    # Keep the same replace-worst policy, but re-check the invariant after each
+    # eviction.  If the next worst item is more salient than the incoming one,
+    # abort and preserve the current store.
+    victims = []
+    trial_used = used
+    remaining = set(store)
+    while remaining and trial_used + sizes[mid] > budget:
+        worst = min(remaining,
+                    key=lambda k: (salience.get(k, 0.0), -order[k]))
+        if salience.get(worst, 0.0) > salience[mid]:
+            return
+        victims.append(worst)
+        remaining.remove(worst)
+        trial_used -= sizes[worst]
+    if trial_used + sizes[mid] > budget:
         return
-    del store[worst]
-    lifecycle["archives"] += 1
-    ever_evicted.add(worst)
+    for worst in victims:
+        del store[worst]
+        lifecycle["archives"] += 1
+        ever_evicted.add(worst)
     store[mid] = salience[mid]
     if mid in ever_evicted:
         lifecycle["restores"] += 1

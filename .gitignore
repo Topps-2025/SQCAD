@@ -22,6 +22,56 @@ tmp/
 remote_results/
 remote_public_contract_cpu.json
 
+# Released open-data exception: LifecycleBench-v3 is published with the paper.
+# It is the only dataset in this repository; everything else stays external.
+!benchmarks/
+!benchmarks/**/*.jsonl
+!benchmarks/**/*.json
+
+# LaTeX build products. Only the released PDF (paper/SQCAD_ICLR2027.pdf) and the
+# editable source (main_iclr2027_draft.tex, references.bib, styles, figures/)
+# are committed; render-check images and per-iteration draft PDFs are local.
+paper/tex/*.aux
+paper/tex/*.log
+paper/tex/*.out
+paper/tex/*.bbl
+paper/tex/*.blg
+paper/tex/*.synctex.gz
+paper/tex/*.pdf
+paper/tex/build*/
+paper/tex/rendered*/
+paper/tex/render*/
+paper/*_v[0-9].pdf
+$build/
+$out/
+$tex/
+paper/tex/$*
+paper/tex/bibtex.log
+paper/tex/bibtex.txt
+paper/tex/render_check_*.png
+paper/tex/render_v[0-9]*.png
+paper/tex/render_pdf.txt
+paper/tex/compile[0-9]*.txt
+paper/tex/merged.txt
+paper/tex/*.zip
+paper/tex/main_iclr2027_draft_v[0-9].tex
+paper/tex/iclr2027_template_*/
+# Superseded manuscript drafts; main_iclr2027_draft.tex is the released source.
+paper/tex/main.tex
+paper/tex/main_revised_0826.tex
+# Figures not referenced by the released manuscript.
+paper/tex/figures/lifecycle_llm_summary.png
+paper/tex/figures/locomo_named_tradeoff.png
+paper/tex/figures/sqcad-core-mechanism.png
+paper/tex/figures/sqcad-framework.png
+
+# Internal run/status notes kept out of the public release: they reference
+# remote endpoints, credential handling, and local absolute paths.
+paper/tex/EXPERIMENT_STATUS_*.md
+paper/tex/ICLR2027_writing_revision_plan_*.md
+paper/tex/VERSION.md
+paper/tex/README.md
+
 # Secrets and local configuration
 .env
 .env.*
