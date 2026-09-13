@@ -8,7 +8,7 @@ The GitHub repository hosts the source; GitHub Pages serves the interactive HTML
 - `app.js` contains the current inline story fixtures. The older local `data/replay.json` is not used by this page.
 - `godot/` is a separate Godot 4.x source prototype, not an embedded web export.
 - `docs/guide.html` is the browser technical guide with Letta ADE-style navigation and state inspection; `docs/TECHNICAL_GUIDE.md` remains the source narrative.
-- `assets/` contains generated illustrations; exact evidence and labels remain HTML.
+- `assets/` contains generated illustrations for the flagship, finance, care, and software cases; exact evidence and labels remain HTML.
 
 The replay is intentionally small and deterministic. It is an explanatory artifact, not a deployed system, a native reproduction of every named baseline, or a SOTA claim. No API keys are required at runtime.
 

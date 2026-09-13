@@ -36,7 +36,7 @@ jobs:
           mkdir -p _site/case_study/assets _site/case_study/docs
           cp index.html _site/index.html
           cp case_study/index.html case_study/app.js case_study/styles.css _site/case_study/
-          cp case_study/assets/world-tree.webp case_study/assets/future-noise.webp case_study/assets/future-missed.webp _site/case_study/assets/
+          cp case_study/assets/*.webp _site/case_study/assets/
           cp case_study/docs/guide.html case_study/docs/guide.css case_study/docs/guide.js _site/case_study/docs/
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
