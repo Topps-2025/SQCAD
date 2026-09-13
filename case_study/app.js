@@ -123,9 +123,9 @@ function renderEvidencePath(action) {
     ${success ? `<div class="resolved-worlds">${currentWorlds().map((w,i) => {
       const best = i === 0 ? 'keep' : 'archive';
       const counter = best === 'keep' ? 'archive' : 'keep';
-      return `<article><span class="small-label">WORLD ${w.id} / ${best.toUpperCase()} AFTER QUALIFICATION</span><blockquote>${action === 'resolve' ? w.source : w.probe}</blockquote>
-        <p>${w.qualified}</p><h4>What the next task can now do</h4><blockquote>${w[best].answer}</blockquote><p>${w[best].outcome}</p>
-        <div class="avoided"><strong>Avoided</strong><span>${w[counter].outcome}</span></div></article>`;
+      return `<article><span class="small-label">WORLD ${w.id} / QUALIFIED BRANCH</span><blockquote>${action === 'resolve' ? w.source : w.probe}</blockquote>
+        <p>${w.qualified}</p><h4>Choose the lasting action for this world</h4><div class="conditional-actions"><button type="button" data-conditional="keep" aria-pressed="${best === 'keep'}">Keep</button><button type="button" data-conditional="archive" aria-pressed="${best === 'archive'}">Archive</button></div><h4>What the next task can now do</h4><blockquote>${w[best].answer}</blockquote><p>${w[best].outcome}</p>
+        <div class="avoided"><strong>Avoided in this branch</strong><span>${w[counter].outcome}</span></div></article>`;
     }).join('')}</div><p class="cost-note">Conditional benefit in this scripted fixture: avoid the wrong memory commitment in either world, at the cost of the check and delay. This is not a measured zero-regret claim. The quotes stand in for sufficient domain evidence; production certificates require validated bounds and scope.</p>`
     : `<div class="pending-path"><h4>Still unresolved → Defer</h4><p>${failure}</p><p>${c.wait}</p><strong>No new persistent authorization; uncertainty stays visible.</strong><p>Deferral preserves the option to learn, but does not itself discover the truth. Delay can be costly. A probe that cannot reduce enough decision risk is not automatically worth buying.</p></div>`}
     <section class="strategy-branches" aria-label="Possible query strategy outcomes"><p class="small-label">THE QUERY ALSO BRANCHES</p><h4>One probe is a path, not a prophecy.</h4><div class="strategy-grid"><article><span>USEFUL EVIDENCE</span><p>The source or current state separates the worlds. Keep in the continuing case; archive in the expired case.</p><strong>Commit conditionally</strong></article><article><span>INCONCLUSIVE EVIDENCE</span><p>The lookup returns a plausible match but no scope, date, or identity. The safe next state remains deferred.</p><strong>Keep the option open</strong></article><article><span>NO QUERY / DEFER</span><p>The agent drafts, routes, or waits without changing default exposure. A later observation may still change the branch.</p><strong>Pay delay, avoid false certainty</strong></article></div></section>
@@ -138,6 +138,11 @@ function renderEvidencePath(action) {
   $('investigationResult').querySelectorAll('[data-evidence-mode]').forEach(b => b.addEventListener('click', () => {
     state.evidenceMode = b.dataset.evidenceMode;
     renderInvestigation(); renderInspector();
+  }));
+  $('investigationResult').querySelectorAll('[data-conditional]').forEach(b => b.addEventListener('click', () => {
+    state.choice = b.dataset.conditional;
+    renderBranches(); renderInspector();
+    $('choiceFeedback').textContent = `After ${action}, this qualified branch selects ${state.choice}. Other possible worlds remain open.`;
   }));
 }
 
@@ -178,7 +183,7 @@ function renderBranches() {
   $('branchGrid').innerHTML = currentWorlds().map(world => {
     const result = world[state.choice];
     return `<article class="future-card ${result.regret ? 'has-regret' : 'no-regret'}"><div class="scene-image"><img src="${world.image}" alt="${world.alt}" width="1536" height="1024"><span class="world-badge">POSSIBLE WORLD ${world.id}</span><span class="scene-caption">${world.id === 'A' ? 'THE COST OF A MISSING WARNING' : 'THE COST OF A STALE RESTRICTION'}</span></div><div class="future-content"><h3>${world.title}</h3><p class="hidden-truth">${world.truth}</p><ol class="consequence-chain"><li><span>YOUR ${state.choice.toUpperCase()}</span><p>${result.action}</p></li><li><span>THE AGENT SUGGESTS</span><blockquote>${result.answer}</blockquote></li><li><span>WHAT FOLLOWS</span><p>${result.outcome}</p></li></ol><div class="regret-status"><span aria-hidden="true">${result.regret ? '↯' : '✓'}</span><div><strong>${result.regret ? 'Regret in this illustrated branch' : 'Aligned in this illustrated branch'}</strong><small>This local comparison is not a claim about every possible future.</small></div></div><p class="future-echo">${result.future}</p></div></article>`;
-  }).join('');
+  }).join('') + `<div class="nested-futures"><div class="nested-heading"><span class="small-label">FOLLOW THE CONSEQUENCE</span><h3>One branch can branch again.</h3><p>After ${state.choice}, the next task may reinforce the memory, discover a new exception, or accumulate another regret. These A1/A2 and B1/B2 cards are additional possibilities—not hidden ground truth.</p></div>${currentWorlds().map(world => `<div class="nested-world"><span class="world-badge">WORLD ${world.id} → ${world.id}1 / ${world.id}2</span><div class="nested-grid"><article><strong>${world.id}1 · Feedback changes the value</strong><p>${state.choice === 'keep' ? 'A later user correction makes the retained note useful in this moment; the earlier Keep now has conditional value.' : 'A later request revives the archived source through an explicit, scoped lookup; Archive preserved reversibility.'}</p><span class="nested-status aligned">VALUE RECOVERED</span></article><article><strong>${world.id}2 · The ambiguity compounds</strong><p>${state.choice === 'keep' ? 'No clarification arrives and the same stale rule is reused, adding another avoidable cost to the regret ledger.' : 'The missing warning is needed in a later task; default Archive avoids exposure but requires a deliberate retrieval step.'}</p><span class="nested-status ${state.choice === 'keep' ? 'regret' : 'tradeoff'}">${state.choice === 'keep' ? 'REGRET ACCUMULATES' : 'REVERSIBILITY HAS A COST'}</span></article></div></div>`).join('')}</div>`;
   $('branchGrid').querySelectorAll('.scene-caption').forEach((node, index) => {
     const captions = activeCase().branchCaptions;
     if (captions?.[index]) node.textContent = captions[index];
