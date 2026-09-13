@@ -1,5 +1,5 @@
 // Narrative continuations are presentation fixtures, never controller inputs.
-const state = { choice: null, revealed: false, investigation: null, caseId: 'alex', evidenceMode: 'decisive' };
+const state = { choice: null, revealed: false, investigation: null, caseId: 'alex', evidenceMode: 'decisive', expandedWorlds: [], leaf: null, evidenceBranch: null, qualifiedChoices: {} };
 const $ = (id) => document.getElementById(id);
 const cases = {
   alex: {label:'Alex · weekend', short:'Personal', avatar:'A', age:'A MEMORY FROM TWO WEEKS AGO', quote:'“Avoid loud venues<br>for Alex.”', source:'Extracted from an older conversation.<br>The original context is incomplete.', scope:'PERSONAL · v1', requestLabel:'ALEX · NOW', request:'“Can you plan something fun for Saturday?”', context:'The note matches the request. It has appeared in successful answers before. But you do not know whether it describes an ongoing need or a one-weekend exception.', branchCaptions:['A QUIET PLAN PREVENTS HARM','A STALE RULE CLOSES A DOOR'], chips:['Relevant to this request','Previously co-retrieved','Current validity unknown'], worlds:null},
@@ -35,7 +35,7 @@ cases.finance.worlds = scenarioWorlds([
 ]);
 cases.care.worlds = scenarioWorlds([
   {title:'The contraindication is still active.', image:'assets/care-risk.webp', truth:'Current labs still show the kidney risk described by the handoff.', source:'“Current kidney function remains reduced; avoid this medication.”', probe:'“The current lab result confirms the contraindication.”', qualified:'Current safety scope supported → keep with clinical authorization.', keep:{regret:false,action:'The warning stays visible to the care team.',answer:'“Route the refill for clinician review.”',outcome:'A current safety constraint prevents an unsafe routine refill.',future:'The scoped warning can be revisited with new labs.'}, archive:{regret:true,action:'The contraindication is removed from default context.',answer:'“Suggest the routine refill.”',outcome:'An unresolved safety risk is missed.',future:'The absence of the warning cannot be interpreted as clinical clearance.'}},
-  {title:'The handoff belonged to an old patient state.', image:'assets/care-delay.webp', truth:'The warning referred to an acute episode that has resolved.', source:'“Avoid this medication during the acute episode only.”', probe:'“The episode resolved; the routine refill is safe.”', qualified:'Expired episode supported → archive the old warning.', keep:{regret:true,action:'The old episode remains a default restriction.',answer:'“Do not suggest the routine refill.”',outcome:'A resolved event continues to constrain care unnecessarily.',future:'Stale safety notes can accumulate and obscure current evidence.'}, archive:{regret:false,action:'The expired warning leaves default exposure.',answer:'“Continue the routine refill workflow.”',outcome:'The team avoids treating historical context as a current contraindication.',future:'The original handoff remains available for audit.'}}
+  {title:'The handoff belonged to an old patient state.', image:'assets/care-delay.webp', truth:'The warning referred to an acute episode that has resolved.', source:'“Avoid this medication during the acute episode only.”', probe:'“The care team confirms that the old episode-specific alert has expired; current refill suitability remains a clinical decision.”', qualified:'Expired episode supported → archive the old warning.', keep:{regret:true,action:'The old episode remains a default restriction.',answer:'“Do not suggest the routine refill.”',outcome:'A resolved event continues to constrain care unnecessarily.',future:'Stale safety notes can accumulate and obscure current evidence.'}, archive:{regret:false,action:'The expired warning leaves default exposure.',answer:'“Continue the routine refill workflow.”',outcome:'The team avoids treating historical context as a current contraindication.',future:'The original handoff remains available for audit.'}}
 ]);
 cases.atlas.worlds = scenarioWorlds([
   {title:'The v2 security rule still applies.', image:'assets/atlas-risk.webp', truth:'The deployment target still uses the legacy credential path.', source:'“This release still needs manual credential rotation.”', probe:'“The target remains v2-compatible; manual rotation is required.”', qualified:'Current deployment scope supported → keep for this project.', keep:{regret:false,action:'The v2 rule stays in the release gate.',answer:'“Rotate credentials and attach the audit record.”',outcome:'The checklist preserves a control the target still requires.',future:'The rule remains scoped to the legacy deployment.'}, archive:{regret:true,action:'The v2 rule is hidden from the checklist.',answer:'“Skip the manual rotation step.”',outcome:'A version assumption creates a credential exposure.',future:'The missing step is difficult to reconstruct after release.'}},
@@ -62,7 +62,7 @@ function reveal() {
   if (!state.choice) return;
   state.revealed = true;
   $('futures').hidden = false;
-  $('investigate').hidden = false;
+  // The evidence route opens only after following a continuation.
   $('revealBtn').textContent = 'Return to your future branches ↓';
   renderBranches();
   renderMethodContrast();
@@ -88,13 +88,13 @@ function renderMethodContrast() {
     ['Age-based decay', 'Age and use history', 'archive', 'The same decay decision removes a stale rule in B and a still-useful warning in A.']
   ];
   panel.innerHTML = `<div class="center-title"><p class="eyebrow">02B / PUT THE RULE ON TRIAL</p>
-    <h2>The score is the same.<br><em>The right action is not.</em></h2>
+    <h2>The score is the same.<br><em>Can its action adapt?</em></h2>
     <p>These are explicit mechanism controls, not native runs of named systems.<br>Try their commitments on this exact case. Changing a threshold can flip the choice, but cannot distinguish these two worlds.</p></div>
-    <div class="method-table-scroll"><table class="method-table"><caption>Same visible evidence; two latent contexts; fixed keep/archive objective</caption>
+    <div class="method-table-scroll"><table class="method-table"><caption>First-task illustration only; full-horizon values are calculated below</caption>
     <thead><tr><th>Control / input</th><th>Rule in this fixture</th><th>World A</th><th>World B</th><th>Replay</th></tr></thead>
     <tbody>${methods.map(([name, input, action, reason]) => `<tr><th>${name}<small>${input}</small></th><td>${reason}</td>${currentWorlds().map(w => `<td class="${w[action].regret ? 'loss' : 'gain'}">${w[action].regret ? 'Regret' : 'Aligned'}<small>${w[action].outcome}</small></td>`).join('')}<td><button class="outline-button" data-control="${action}">Try ${action}</button></td></tr>`).join('')}
     <tr class="strong-control"><th>Evidence-aware control<small>Same source lookup or scoped check as SQCAD</small></th><td>Obtain distinguishing evidence, then choose per world. This control is allowed to succeed.</td><td class="gain">Conditional keep</td><td class="gain">Conditional archive</td><td><button class="outline-button" id="tryEvidenceControl">Try evidence</button></td></tr></tbody></table></div>
-    <div class="fairness-note"><h3>Could an existing method avoid this?</h3><p>Yes—if it preserves the missing scope, asks a useful question, or estimates the relevant access effect. Then it has information outside this score-only comparison. The paper's Trivium audit is an informative negative case, not a method we should force to fail.</p>
+    <div class="fairness-note"><h3>Could an existing method avoid this?</h3><p>Yes—if it preserves the missing scope, asks a useful question, or estimates the relevant access effect. That is an informative control: it obtains information missing from the displayed scores. The calculator below allows such a policy to remove the collision. The paper's Trivium audit is an informative negative case, not a method we should force to fail.</p>
     <p>The precise gap is <strong>using a proposal score as persistent authorization when compatible worlds require opposite actions</strong>. SQCAD makes that evidence boundary, the cost of checking, and the separation of temporary access from persistent permission explicit.</p>
     <a href="docs/guide.html#theory">Inspect the theorem, evidence boundary and control definitions ↗</a></div>`;
   $('investigate').before(panel);
@@ -103,48 +103,12 @@ function renderMethodContrast() {
     $('futures').scrollIntoView({behavior: reducedMotion() ? 'instant' : 'smooth'});
   }));
   $('tryEvidenceControl').addEventListener('click', () => {
+    $('investigate').hidden = false;
     investigate('resolve');
     $('investigationResult').scrollIntoView({behavior: reducedMotion() ? 'instant' : 'smooth'});
   });
 }
 
-function renderEvidencePath(action) {
-  const c = caseDetails[state.caseId];
-  const success = action !== 'defer' && state.evidenceMode === 'decisive';
-  const controls = action === 'defer' ? '' : `<fieldset class="evidence-modes"><legend>Stress-test the evidence check</legend>
-    ${[['decisive','Useful evidence'],['inconclusive','No useful evidence'],['costly','Check too costly']].map(([id,label]) => `<button type="button" data-evidence-mode="${id}" aria-pressed="${state.evidenceMode === id}">${label}</button>`).join('')}</fieldset>`;
-  const heading = action === 'defer' ? 'Pause the lasting change. Keep a route back.' : action === 'resolve' ? 'Recover the missing scope.' : 'Read once. Qualify before keeping.';
-  const question = action === 'probe' ? c.check : c.lookup;
-  const failure = action === 'defer' ? c.wait : state.evidenceMode === 'costly' ? c.costly : c.inconclusive;
-  $('investigationResult').innerHTML = `<p class="eyebrow">COUNTERFACTUAL REWIND / ${action.toUpperCase()}</p><h3>${heading}</h3>
-    <p>Return to the original decision point. Your earlier choice remains visible above; this alternative path does not undo a past outcome.</p>
-    <ol class="path-steps"><li><strong>1 · Defer persistent change</strong><span>No new keep/archive authorization. Preserve source and provenance.</span></li><li><strong>2 · ${action === 'defer' ? 'Wait with a review route' : action === 'resolve' ? 'Inspect the source' : 'Allow a scoped check'}</strong><span>${action === 'defer' ? c.wait : question}</span></li><li><strong>3 · Qualify, then authorize</strong><span>Only evidence that resolves the decision in the correct scope can authorize a lasting change.</span></li></ol>
-    ${controls}
-    ${success ? `<div class="resolved-worlds">${currentWorlds().map((w,i) => {
-      const best = i === 0 ? 'keep' : 'archive';
-      const counter = best === 'keep' ? 'archive' : 'keep';
-      return `<article><span class="small-label">WORLD ${w.id} / QUALIFIED BRANCH</span><blockquote>${action === 'resolve' ? w.source : w.probe}</blockquote>
-        <p>${w.qualified}</p><h4>Choose the lasting action for this world</h4><div class="conditional-actions"><button type="button" data-conditional="keep" aria-pressed="${best === 'keep'}">Keep</button><button type="button" data-conditional="archive" aria-pressed="${best === 'archive'}">Archive</button></div><h4>What the next task can now do</h4><blockquote>${w[best].answer}</blockquote><p>${w[best].outcome}</p>
-        <div class="avoided"><strong>Avoided in this branch</strong><span>${w[counter].outcome}</span></div></article>`;
-    }).join('')}</div><p class="cost-note">Conditional benefit in this scripted fixture: avoid the wrong memory commitment in either world, at the cost of the check and delay. This is not a measured zero-regret claim. The quotes stand in for sufficient domain evidence; production certificates require validated bounds and scope.</p>`
-    : `<div class="pending-path"><h4>Still unresolved → Defer</h4><p>${failure}</p><p>${c.wait}</p><strong>No new persistent authorization; uncertainty stays visible.</strong><p>Deferral preserves the option to learn, but does not itself discover the truth. Delay can be costly. A probe that cannot reduce enough decision risk is not automatically worth buying.</p></div>`}
-    <section class="strategy-branches" aria-label="Possible query strategy outcomes"><p class="small-label">THE QUERY ALSO BRANCHES</p><h4>One probe is a path, not a prophecy.</h4><div class="strategy-grid"><article><span>USEFUL EVIDENCE</span><p>The source or current state separates the worlds. Keep in the continuing case; archive in the expired case.</p><strong>Commit conditionally</strong></article><article><span>INCONCLUSIVE EVIDENCE</span><p>The lookup returns a plausible match but no scope, date, or identity. The safe next state remains deferred.</p><strong>Keep the option open</strong></article><article><span>NO QUERY / DEFER</span><p>The agent drafts, routes, or waits without changing default exposure. A later observation may still change the branch.</p><strong>Pay delay, avoid false certainty</strong></article></div></section>
-    <details class="ablation-note"><summary>Remove a component: what breaks?</summary><ul>
-      <li><strong>Without an evidence route:</strong> deferring forever leaves this ambiguity unresolved.</li>
-      <li><strong>Without a qualification gate:</strong> an inconclusive check can be mistaken for permission to keep.</li>
-      <li><strong>Without scope/version checks:</strong> useful evidence from another patient, borrower or release can authorize the wrong memory.</li>
-      <li><strong>Without temporary-access separation:</strong> retrieving the note once can silently promote it into every future task.</li>
-    </ul><p>These are mechanism ablations of the explanation, not new benchmark measurements.</p></details>`;
-  $('investigationResult').querySelectorAll('[data-evidence-mode]').forEach(b => b.addEventListener('click', () => {
-    state.evidenceMode = b.dataset.evidenceMode;
-    renderInvestigation(); renderInspector();
-  }));
-  $('investigationResult').querySelectorAll('[data-conditional]').forEach(b => b.addEventListener('click', () => {
-    state.choice = b.dataset.conditional;
-    renderBranches(); renderInspector();
-    $('choiceFeedback').textContent = `After ${action}, this qualified branch selects ${state.choice}. Other possible worlds remain open.`;
-  }));
-}
 
 const caseDetails = {
   alex: {
@@ -182,8 +146,9 @@ function renderBranches() {
   $('switchChoice').textContent = `Try ${state.choice === 'keep' ? 'archive' : 'keep'} instead ↺`;
   $('branchGrid').innerHTML = currentWorlds().map(world => {
     const result = world[state.choice];
-    return `<article class="future-card ${result.regret ? 'has-regret' : 'no-regret'}"><div class="scene-image"><img src="${world.image}" alt="${world.alt}" width="1536" height="1024"><span class="world-badge">POSSIBLE WORLD ${world.id}</span><span class="scene-caption">${world.id === 'A' ? 'THE COST OF A MISSING WARNING' : 'THE COST OF A STALE RESTRICTION'}</span></div><div class="future-content"><h3>${world.title}</h3><p class="hidden-truth">${world.truth}</p><ol class="consequence-chain"><li><span>YOUR ${state.choice.toUpperCase()}</span><p>${result.action}</p></li><li><span>THE AGENT SUGGESTS</span><blockquote>${result.answer}</blockquote></li><li><span>WHAT FOLLOWS</span><p>${result.outcome}</p></li></ol><div class="regret-status"><span aria-hidden="true">${result.regret ? '↯' : '✓'}</span><div><strong>${result.regret ? 'Regret in this illustrated branch' : 'Aligned in this illustrated branch'}</strong><small>This local comparison is not a claim about every possible future.</small></div></div><p class="future-echo">${result.future}</p></div></article>`;
-  }).join('') + `<div class="nested-futures"><div class="nested-heading"><span class="small-label">FOLLOW THE CONSEQUENCE</span><h3>One branch can branch again.</h3><p>After ${state.choice}, the next task may reinforce the memory, discover a new exception, or accumulate another regret. These A1/A2 and B1/B2 cards are additional possibilities—not hidden ground truth.</p></div>${currentWorlds().map(world => `<div class="nested-world"><span class="world-badge">WORLD ${world.id} → ${world.id}1 / ${world.id}2</span><div class="nested-grid"><article><strong>${world.id}1 · Feedback changes the value</strong><p>${state.choice === 'keep' ? 'A later user correction makes the retained note useful in this moment; the earlier Keep now has conditional value.' : 'A later request revives the archived source through an explicit, scoped lookup; Archive preserved reversibility.'}</p><span class="nested-status aligned">VALUE RECOVERED</span></article><article><strong>${world.id}2 · The ambiguity compounds</strong><p>${state.choice === 'keep' ? 'No clarification arrives and the same stale rule is reused, adding another avoidable cost to the regret ledger.' : 'The missing warning is needed in a later task; default Archive avoids exposure but requires a deliberate retrieval step.'}</p><span class="nested-status ${state.choice === 'keep' ? 'regret' : 'tradeoff'}">${state.choice === 'keep' ? 'REGRET ACCUMULATES' : 'REVERSIBILITY HAS A COST'}</span></article></div></div>`).join('')}</div>`;
+    return `<article class="future-card ${result.regret ? 'has-regret' : 'no-regret'}"><div class="scene-image"><img src="${world.image}" alt="${world.alt}" width="1536" height="1024"><span class="world-badge">POSSIBLE WORLD ${world.id}</span><span class="scene-caption">${world.id === 'A' ? 'THE COST OF A MISSING WARNING' : 'THE COST OF A STALE RESTRICTION'}</span></div><div class="future-content"><h3>${world.title}</h3><p class="hidden-truth">${world.truth}</p><ol class="consequence-chain"><li><span>YOUR ${state.choice.toUpperCase()}</span><p>${result.action}</p></li><li><span>THE AGENT SUGGESTS</span><blockquote>${result.answer}</blockquote></li><li><span>WHAT FOLLOWS</span><p>${result.outcome}</p></li></ol><div class="regret-status"><span aria-hidden="true">${result.regret ? '↯' : '✓'}</span><div><strong>${result.regret ? 'Loss on this task' : 'Helpful on this task'}</strong><small>A task-level illustration, not expected lifecycle regret.</small></div></div><p class="future-echo">${result.future}</p>${continuationControls(world)}</div></article>`;
+  }).join('');
+  bindContinuations();
   $('branchGrid').querySelectorAll('.scene-caption').forEach((node, index) => {
     const captions = activeCase().branchCaptions;
     if (captions?.[index]) node.textContent = captions[index];
@@ -193,7 +158,8 @@ function renderBranches() {
 function investigate(action) {
   if (!state.revealed) return;
   state.investigation = action;
-  state.evidenceMode = 'decisive';
+  state.evidenceBranch = null;
+  state.qualifiedChoices = {};
   renderInvestigation();
   renderInspector();
 }
@@ -203,19 +169,22 @@ function renderInvestigation() {
   document.querySelectorAll('[data-investigation]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.investigation === action)));
   $('investigationResult').hidden = !action;
   if (!action) return;
-  renderEvidencePath(action);
+  renderEvidenceTree(action);
 }
 
 function renderInspector() {
-  const qualified = state.investigation && state.investigation !== 'defer' && state.evidenceMode === 'decisive';
-  $('qualificationState').textContent = qualified ? 'Scope supported, per world' : 'Unresolved';
-  $('authorizationState').textContent = qualified ? 'A: keep / B: archive' : state.investigation ? 'Defer; no new authorization' : (state.choice ? `${state.choice} (visitor choice)` : 'Not selected');
-  $('accessState').textContent = state.investigation === 'probe' ? 'Temporary scoped read; expired' : state.investigation === 'resolve' ? 'Source inspection' : 'No probe';
-  $('auditTrace').textContent = state.investigation ? `Counterfactual rewind → defer persistent change → ${state.investigation} → ${qualified ? 'qualify scope → conditional authorization' : 'insufficient evidence → defer / review'}.` : `Source note → relevance proposal → ${state.choice || 'decision pending'}${state.revealed ? ' → opposite consequences in two latent worlds' : ''}.`;
+  const supported = ['useful','arrives'].includes(state.evidenceBranch);
+  $('qualificationState').textContent = supported ? 'Assumed scoped certificate (replay)' : 'Unresolved';
+  $('authorizationState').textContent = state.investigation ? supported ? currentWorlds().map(w => w.id + ': ' + (state.qualifiedChoices[w.id] || 'not selected')).join(' / ') : 'Defer; no new authorization' : (state.choice ? state.choice + ' (visitor choice)' : 'Not selected');
+  $('accessState').textContent = state.investigation === 'probe' ? 'Scoped check; no permanent promotion' : state.investigation === 'resolve' ? 'Source inspection only' : 'No probe';
+  $('auditTrace').textContent = state.investigation ? 'Root ' + state.choice + ' retained → rewind → ' + state.investigation + ' → ' + (state.evidenceBranch || 'observation pending') + '. Unsupported visitor choices are simulated, not SQCAD authorizations.' : 'Source note → relevance proposal → ' + (state.choice || 'decision pending') + (state.leaf ? ' → possible trajectory ' + state.leaf : '');
 }
 
 function reset() {
   state.choice = null; state.revealed = false; state.investigation = null;
+  state.expandedWorlds = []; state.leaf = null; state.evidenceBranch = null; state.qualifiedChoices = {};
+  $('trajectory').hidden = true; $('valueLandscape').hidden = true;
+  $('trajectory').replaceChildren(); $('whatAboutProbe').disabled = true;
   $('futures').hidden = true; $('investigate').hidden = true;
   $('branchGrid').replaceChildren(); $('investigationResult').replaceChildren();
   $('methodContrast')?.remove();

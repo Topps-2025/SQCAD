@@ -35,7 +35,7 @@ jobs:
         run: |
           mkdir -p _site/case_study/assets _site/case_study/docs
           cp index.html _site/index.html
-          cp case_study/index.html case_study/app.js case_study/styles.css _site/case_study/
+          cp case_study/index.html case_study/app.js case_study/future-model.js case_study/future-view.js case_study/styles.css _site/case_study/
           cp case_study/assets/*.webp _site/case_study/assets/
           cp case_study/docs/guide.html case_study/docs/guide.css case_study/docs/guide.js _site/case_study/docs/
       - name: Upload site
