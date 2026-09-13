@@ -6,11 +6,17 @@ The GitHub repository hosts the source; GitHub Pages serves the interactive HTML
 
 - `index.html` is the browser replay and audit view.
 - `app.js` contains the current inline story fixtures. The older local `data/replay.json` is not used by this page.
+- `future-model.js` declares four three-task continuations, the hypothetical payoff triples, and the expectation calculation; none of its numbers are empirical paper results.
+- `future-view.js` renders illustrated child branches, independent evidence routes, and the interactive horizon/policy/probability comparison. Selecting a qualified action does not overwrite the root choice.
 - `godot/` is a separate Godot 4.x source prototype, not an embedded web export.
 - `docs/guide.html` is the browser technical guide with Letta ADE-style navigation and state inspection; `docs/TECHNICAL_GUIDE.md` remains the source narrative.
 - `assets/` contains generated illustrations for the flagship, finance, care, and software cases; exact evidence and labels remain HTML.
 
 The replay is intentionally small and deterministic. It is an explanatory artifact, not a deployed system, a native reproduction of every named baseline, or a SOTA claim. No API keys are required at runtime.
+
+Follow either root choice, expand A or B, and choose a child future. The bridge then opens Probe/Resolve/Defer as counterfactual alternatives. The final value landscape enumerates all four leaves of the finite teaching model; it does not claim to enumerate all real futures. Its evidence-aware policy is allowed to remove the score-fiber collision.
+
+Run the model and asset checks with `node --test case_study/tests/future-model.test.cjs`.
 
 ## Run locally
 

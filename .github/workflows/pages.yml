@@ -27,6 +27,8 @@ jobs:
       - name: Check browser scripts
         run: |
           node --check case_study/app.js
+          node --check case_study/future-view.js
+          node --test case_study/tests/future-model.test.cjs
           node --check case_study/docs/guide.js
       - name: Configure Pages
         uses: actions/configure-pages@v5

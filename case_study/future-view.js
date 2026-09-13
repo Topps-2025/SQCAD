@@ -57,7 +57,6 @@ function renderLandscape() {
 }
 
 function initFutureView() {
-  $('trajectory').before(document.createTextNode(''));
   $('branchGrid').after($('trajectory'));
   $('trajectory').after($('whatAboutProbe'));
   $('whatAboutProbe').addEventListener('click',()=>{
