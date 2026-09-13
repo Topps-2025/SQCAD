@@ -24,8 +24,8 @@ const worlds = [
 cases.alex.worlds = worlds;
 function scenarioWorlds(config) {
   return config.map((w, i) => ({
-    id: String.fromCharCode(65 + i), image: i === 0 ? 'assets/future-noise.webp' : 'assets/future-missed.webp',
-    alt: 'Illustrative possible future.', ...w,
+    id: String.fromCharCode(65 + i), image: w.image || (i === 0 ? 'assets/future-noise.webp' : 'assets/future-missed.webp'),
+    alt: w.alt || 'Illustrative possible future.', ...w,
     keep: w.keep, archive: w.archive
   }));
 }
@@ -65,7 +65,19 @@ function reveal() {
   $('investigate').hidden = false;
   $('revealBtn').textContent = 'Return to your future branches ↓';
   renderBranches();
+  renderMethodContrast();
   $('futures').scrollIntoView({ behavior: reducedMotion() ? 'instant' : 'smooth', block: 'start' });
+}
+
+function renderMethodContrast() {
+  let panel = $('methodContrast');
+  if (panel) return;
+  panel = document.createElement('section');
+  panel.id = 'methodContrast';
+  panel.className = 'method-contrast wrap';
+  panel.setAttribute('aria-labelledby', 'contrastTitle');
+  panel.innerHTML = `<div class="center-title"><p class="eyebrow">WHY THE GAP IS REAL</p><h2 id="contrastTitle">A stronger score still sees one evidence state.</h2><p>Ranking and reinforcement can find a candidate. They cannot identify the context needed for a persistent decision.</p></div><div class="contrast-grid"><article><span class="small-label">RELEVANCE ONLY</span><h3>Match → Keep</h3><p>Similarity proposes the note, then silently treats relevance as permission. It cannot test scope or current validity.</p><strong>Failure · no qualification</strong></article><article><span class="small-label">OUTCOME CREDIT</span><h3>Co-exposure → Trust</h3><p>A memory is credited because it appeared near a successful answer. Exposure is feedback, not proof of causal contribution.</p><strong>Failure · confounded feedback</strong></article><article><span class="small-label">DECAY / WORTH</span><h3>Age → Downweight</h3><p>Old notes fade smoothly, although rare constraints can stay quiet and become decisive in one later task.</p><strong>Failure · rarity ≠ irrelevance</strong></article><article class="contrast-sqcad"><span class="small-label">SQCAD</span><h3>Uncertainty → Defer / Probe</h3><p>Qualification stays separate from authorization. Resolve lineage or run a reversible probe before changing default exposure.</p><strong>Result · avoid irreversible regret</strong></article></div>`;
+  $('investigate').before(panel);
 }
 
 function renderBranches() {
