@@ -3,10 +3,16 @@ name: Deploy SQCAD case study
 on:
   push:
     branches: [main]
+    paths:
+      - 'index.html'
+      - 'case_study/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages
@@ -21,16 +27,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Check browser scripts
+        run: |
+          node --check case_study/app.js
+          node --check case_study/docs/guide.js
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
       - name: Assemble public site
         shell: bash
         run: |
-          mkdir -p _site
+          mkdir -p _site/case_study/assets _site/case_study/docs
           cp index.html _site/index.html
-          cp -R case_study _site/case_study
-          find _site -name '*.md' -delete
-      - name: Publish gh-pages branch
-        uses: JamesIves/github-pages-deploy-action@v4
+          cp case_study/index.html case_study/app.js case_study/styles.css _site/case_study/
+          cp case_study/assets/world-tree.webp case_study/assets/future-noise.webp case_study/assets/future-missed.webp _site/case_study/assets/
+          cp case_study/docs/guide.html case_study/docs/guide.css case_study/docs/guide.js _site/case_study/docs/
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: _site
-          branch: gh-pages
-          clean: true
+          path: _site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
