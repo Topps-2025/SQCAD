@@ -33,6 +33,32 @@
       B2: ['More managed releases', 'Today: the obsolete manual step stalls v3.', 'Next release: managed credentials still make the old step unnecessary.', 'Next patch: another release hits the same obsolete gate. Delay accumulates.']
     }
   };
+  const archiveStories = {
+    alex: {
+      A1:['The default planner misses the continuing warning.', 'The restaurant suggestion omits the sound constraint again.', 'Another loud suggestion misses the still-relevant warning.'],
+      A2:['The warning is absent from the first plan.', 'A reading list needs no venue warning; no exposure overhead.', 'A train timetable also needs no venue warning.'],
+      B1:['The expired exception no longer blocks the wanted concert.', 'The new exam makes quiet useful, but the archived note is absent from the default plan.', 'The new exam period continues; the unguarded policy still misses that useful constraint.'],
+      B2:['The wanted concert is no longer filtered out.', 'The lively birthday option remains available.', 'The wanted festival is not excluded by the expired rule.']
+    },
+    finance: {
+      A1:['The structural-risk flag is absent from the default review.', 'Another review misses the same still-relevant flag.', 'The renewal review lacks a continuing risk reminder.'],
+      A2:['The first review misses the continuing risk flag.', 'The address update needs no liquidity flag.', 'The account summary avoids irrelevant flag overhead.'],
+      B1:['The cleared receivable no longer triggers the stale flag.', 'A new payment delay receives no default reminder from the archived note.', 'The new shortfall continues without that reminder.'],
+      B2:['The expired flag no longer delays review.', 'Current sound finances are reviewed without the old obstacle.', 'Renewal avoids another stale-flag exception.']
+    },
+    care: {
+      A1:['The care team does not see the still-current alert in default context.', 'A later visit again lacks that alert.', 'The follow-up still requires evidence the default context omits.'],
+      A2:['The first clinician review lacks the current alert.', 'Appointment rescheduling needs no medication alert.', 'Clinic directions incur no irrelevant alert overhead.'],
+      B1:['The resolved episode no longer causes a duplicate referral.', 'A new concern arises without the old alert in default context; current labs still require review.', 'The new episode continues; retrieving current evidence requires a separate route.'],
+      B2:['The obsolete episode no longer adds a referral.', 'The team avoids clearing that historical alert again.', 'Follow-up avoids duplicate referral overhead; current clinical review remains required.']
+    },
+    atlas: {
+      A1:['The legacy release checklist lacks the current control.', 'The next legacy deployment again lacks the reminder.', 'The legacy patch still needs that missing checklist item.'],
+      A2:['The first legacy checklist lacks the control.', 'Release notes need no credential instruction.', 'The changelog avoids irrelevant rotation context.'],
+      B1:['The obsolete manual step no longer blocks managed v3.', 'A legacy hotfix now needs the archived runbook, which is absent by default.', 'Another legacy patch misses that useful old control.'],
+      B2:['The managed release avoids the obsolete step.', 'The next managed release avoids that manual gate.', 'The patch avoids another obsolete-step delay.']
+    }
+  };
   function steps(id, action, policy = 'reuse') {
     return payoffs[id][action].map((row, t) => {
       if (policy === 'reuse') return [...row];
@@ -53,7 +79,7 @@
     const ps = weights(options.pA, options.pA1, options.pB1);
     return Object.entries(ps).reduce((sum, [id,p]) => sum + p*value(id,action,options),0);
   }
-  const api = {payoffs,stories,steps,value,weights,aggregate};
+  const api = {payoffs,stories,archiveStories,steps,value,weights,aggregate};
   if (typeof module !== 'undefined') module.exports = api;
   root.SQFuture = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

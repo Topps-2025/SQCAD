@@ -1,7 +1,7 @@
 // UI state belongs to this replay, not to a deployed memory controller.
 const futureOptions = {horizon:3,gamma:.9,pA:.5,pA1:.5,pB1:.5,policy:'reuse'};
 const number = n => `${n > 0 ? '+' : ''}${n.toFixed(2)}`;
-const art = (kind, panel) => `assets/${state.caseId}-${kind}-${panel}.webp`;
+const art = (kind, panel) => `assets/${state.caseId}-${kind}-${panel}.webp?v=branching-3`;
 
 function continuationControls(world) {
   const open = state.expandedWorlds.includes(world.id);
@@ -38,7 +38,8 @@ function renderTrajectory() {
   target.innerHTML = `<div class="trajectory-cover"><img src="${art('future',id)}" alt="${s[0]}" width="1024" height="1024"><div><p class="eyebrow">YOU FOLLOWED ${id} / INITIAL ${state.choice.toUpperCase()}</p><h3>${s[0]}</h3><p>Keep and Archive below share this task sequence and the same continuation policy. They differ in exposure, cost and what can be recovered.</p><span class="small-label">HYPOTHETICAL TEACHING UNITS · NOT MEASURED RESULTS</span></div></div>
     <div class="task-ledger">${[1,2,3].map((t,i)=>{
       const ku = k[i][0]-k[i][1]-k[i][2], au = a[i][0]-a[i][1]-a[i][2];
-      return `<article class="${t>futureOptions.horizon?'beyond-horizon':''}"><span class="small-label">TASK ${t}${t>futureOptions.horizon?' / OUTSIDE SELECTED H':''}</span><p>${s[t]}</p><div class="paired-utility"><span>Keep <b>${number(ku)}</b></span><span>Archive <b>${number(au)}</b></span></div><small>Task contrast: ${number(ku-au)} · before discounting</small></article>`;
+      const explanation = futureOptions.policy==='reuse' ? `<p><b>Keep:</b> ${s[t]}</p><p><b>Archive:</b> ${SQFuture.archiveStories[state.caseId][id][i]}</p>` : '<p>Both paths check current scope: retrieve an archived source when useful, or filter a kept note when unsuitable. Each pays the check cost; Keep also pays persistent exposure overhead.</p>';
+      return `<article class="${t>futureOptions.horizon?'beyond-horizon':''}"><span class="small-label">TASK ${t}${t>futureOptions.horizon?' / OUTSIDE SELECTED H':''}</span>${explanation}<div class="paired-utility"><span>Keep <b>${number(ku)}</b></span><span>Archive <b>${number(au)}</b></span></div><small>Task contrast: ${number(ku-au)} · before discounting</small></article>`;
     }).join('')}</div><div class="trajectory-verdict"><strong>${id}: G(Keep) − G(Archive) = ${number(delta)}</strong><p>${id==='B1'?'The first missed opportunity remains a loss. Later tasks can make retention useful again; increasing the horizon can even reverse the cumulative contrast.':id==='A2'?'A useful warning can become irrelevant on later tasks. Exposure costs continue even when there is no obvious harmful answer.':'Following more tasks can accumulate the effect of a memory decision.'} This path return is one term in an expectation, not the expectation itself.</p></div>`;
   renderLandscape();
 }

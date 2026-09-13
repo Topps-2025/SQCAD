@@ -50,6 +50,8 @@ function renderCase(){const c=activeCase(); $('memoryAge').textContent=c.age; $(
 function selectChoice(choice) {
   state.choice = choice;
   state.investigation = null;
+  state.evidenceBranch = null;
+  state.qualifiedChoices = {};
   document.querySelectorAll('[data-choice]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.choice === choice)));
   $('revealBtn').disabled = false;
   $('choiceFeedback').textContent = choice === 'keep' ? 'You kept the note in default exposure. Follow both possible futures.' : 'You archived the note. It is stored, but no longer exposed by default.';
@@ -88,7 +90,7 @@ function renderMethodContrast() {
     ['Age-based decay', 'Age and use history', 'archive', 'The same decay decision removes a stale rule in B and a still-useful warning in A.']
   ];
   panel.innerHTML = `<div class="center-title"><p class="eyebrow">02B / PUT THE RULE ON TRIAL</p>
-    <h2>The score is the same.<br><em>Can its action adapt?</em></h2>
+    <h2 id="contrastTitle">The score is the same.<br><em>Can its action adapt?</em></h2>
     <p>These are explicit mechanism controls, not native runs of named systems.<br>Try their commitments on this exact case. Changing a threshold can flip the choice, but cannot distinguish these two worlds.</p></div>
     <div class="method-table-scroll"><table class="method-table"><caption>First-task illustration only; full-horizon values are calculated below</caption>
     <thead><tr><th>Control / input</th><th>Rule in this fixture</th><th>World A</th><th>World B</th><th>Replay</th></tr></thead>

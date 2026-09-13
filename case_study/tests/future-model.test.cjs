@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const {createHash} = require('node:crypto');
 const model = require('../future-model.js');
 
 test('B1 can lose first and gain over a longer horizon without erasing the loss', () => {
@@ -28,13 +29,22 @@ test('evidence-aware policy is allowed to remove the sign collision',()=>{
   assert.ok(a>0 && b<0);
 });
 test('future narrative and generated images exist for every case and leaf',()=>{
+  const imageHashes = new Set();
+  const checkImage = file => {
+    const bytes=fs.readFileSync(file);
+    assert.ok(bytes.length>1000);
+    assert.equal(bytes.toString('ascii',8,12),'WEBP');
+    imageHashes.add(createHash('sha256').update(bytes).digest('hex'));
+  };
   for(const id of Object.keys(model.stories)) {
     for(const panel of ['A1','A2','B1','B2']) {
       assert.equal(model.stories[id][panel].length,4);
-      assert.ok(fs.statSync(path.join(__dirname,`../assets/${id}-future-${panel}.webp`)).size>1000);
+      assert.equal(model.archiveStories[id][panel].length,3);
+      checkImage(path.join(__dirname,`../assets/${id}-future-${panel}.webp`));
     }
     for(const panel of ['resolve','probe','uncertain','delay']) {
-      assert.ok(fs.statSync(path.join(__dirname,`../assets/${id}-evidence-${panel}.webp`)).size>1000);
+      checkImage(path.join(__dirname,`../assets/${id}-evidence-${panel}.webp`));
     }
   }
+  assert.equal(imageHashes.size,32,'Each branch must have its own scene, not a copied placeholder.');
 });
