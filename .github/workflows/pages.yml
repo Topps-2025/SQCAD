@@ -29,7 +29,6 @@ jobs:
           node --check case_study/app.js
           node --check case_study/future-view.js
           node --test case_study/tests/future-model.test.cjs
-          node --check case_study/docs/guide.js
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Assemble public site
@@ -39,7 +38,8 @@ jobs:
           cp index.html _site/index.html
           cp case_study/index.html case_study/app.js case_study/future-model.js case_study/future-view.js case_study/styles.css _site/case_study/
           cp case_study/assets/*.webp _site/case_study/assets/
-          cp case_study/docs/guide.html case_study/docs/guide.css case_study/docs/guide.js _site/case_study/docs/
+          # Keep the old URL as a redirect to the repository documentation.
+          cp case_study/docs/guide.html _site/case_study/docs/
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:

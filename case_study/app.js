@@ -98,7 +98,7 @@ function renderMethodContrast() {
     <tr class="strong-control"><th>Evidence-aware control<small>Same source lookup or scoped check as SQCAD</small></th><td>Obtain distinguishing evidence, then choose per world. This control is allowed to succeed.</td><td class="gain">Conditional keep</td><td class="gain">Conditional archive</td><td><button class="outline-button" id="tryEvidenceControl">Try evidence</button></td></tr></tbody></table></div>
     <div class="fairness-note"><h3>Could an existing method avoid this?</h3><p>Yes—if it preserves the missing scope, asks a useful question, or estimates the relevant access effect. That is an informative control: it obtains information missing from the displayed scores. The calculator below allows such a policy to remove the collision. The paper's Trivium audit is an informative negative case, not a method we should force to fail.</p>
     <p>The precise gap is <strong>using a proposal score as persistent authorization when compatible worlds require opposite actions</strong>. SQCAD makes that evidence boundary, the cost of checking, and the separation of temporary access from persistent permission explicit.</p>
-    <a href="docs/guide.html#theory">Inspect the theorem, evidence boundary and control definitions ↗</a></div>`;
+    <a href="https://github.com/Topps-2025/SQCAD/blob/main/paper/tex/main_iclr2027_draft.tex">Read the theory in the repository ↗</a></div>`;
   $('investigate').before(panel);
   panel.querySelectorAll('[data-control]').forEach(button => button.addEventListener('click', () => {
     selectChoice(button.dataset.control);
@@ -207,7 +207,3 @@ $('resetBtn').addEventListener('click', reset);
 renderCasePicker();
 renderCase();
 renderInspector();
-// Keep the browser experience on the standalone guide even when an older fixture link remains.
-document.querySelectorAll('a[href*="TECHNICAL_GUIDE.md"]').forEach((link) => {
-  link.href = link.href.replace('TECHNICAL_GUIDE.md', 'guide.html');
-});
