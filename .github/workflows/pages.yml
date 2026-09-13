@@ -6,9 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
@@ -23,8 +21,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
       - name: Assemble public site
         shell: bash
         run: |
@@ -32,10 +28,9 @@ jobs:
           cp index.html _site/index.html
           cp -R case_study _site/case_study
           find _site -name '*.md' -delete
-      - name: Upload site
-        uses: actions/upload-pages-artifact@v3
+      - name: Publish gh-pages branch
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          path: _site
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          folder: _site
+          branch: gh-pages
+          clean: true
